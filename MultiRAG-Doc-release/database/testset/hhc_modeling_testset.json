@@ -1,0 +1,176 @@
+[
+  {
+    "id": "hhc_basic_routing_waiting",
+    "name": "Basic HHC routing with waiting",
+    "problem": "Build a compact home health care routing and scheduling model for assigning patients to caregivers, planning visit routes, and minimizing travel time and patient waiting time. Do not include skill matching, outsourcing, VIP priority, time windows, workload balance, or open routes.",
+    "expected_selected": [
+      "assignment",
+      "routing_flow",
+      "time_propagation",
+      "waiting_time"
+    ],
+    "expected_omitted": [
+      "balance",
+      "open_route",
+      "outsourcing",
+      "priority_class",
+      "skill_matching",
+      "time_window"
+    ],
+    "expected_not_selected": [
+      "capacity"
+    ]
+  },
+  {
+    "id": "hhc_time_window_skill_capacity_balance",
+    "name": "Time windows, skill, capacity and balance",
+    "problem": "Build a home health care routing and scheduling model with patient time windows, caregiver skill matching, workload capacity limits, and workload balance. The objective should trade off travel time and waiting time.",
+    "expected_selected": [
+      "assignment",
+      "balance",
+      "capacity",
+      "routing_flow",
+      "skill_matching",
+      "time_propagation",
+      "time_window",
+      "waiting_time"
+    ],
+    "expected_omitted": [],
+    "expected_not_selected": [
+      "outsourcing",
+      "priority_class",
+      "open_route"
+    ]
+  },
+  {
+    "id": "hhc_open_route_outsourcing",
+    "name": "Open-route HHC with outsourcing",
+    "problem": "Build an open-route home health care model where caregivers do not return to the depot, some patients may be outsourced with a penalty, and the objective minimizes travel time and patient waiting time. Do not include skill matching or VIP priority.",
+    "expected_selected": [
+      "assignment",
+      "open_route",
+      "outsourcing",
+      "routing_flow",
+      "time_propagation",
+      "waiting_time"
+    ],
+    "expected_omitted": [
+      "priority_class",
+      "skill_matching"
+    ],
+    "expected_not_selected": [
+      "balance",
+      "capacity",
+      "time_window"
+    ]
+  },
+  {
+    "id": "hhc_hard_time_windows_no_waiting",
+    "name": "Hard time windows without waiting objective",
+    "problem": "Build a home health care routing model with hard patient time windows and route timing constraints. Minimize travel time only. Do not include waiting time, skill matching, outsourcing, VIP priority, workload balance, or open routes.",
+    "expected_selected": [
+      "assignment",
+      "routing_flow",
+      "time_propagation",
+      "time_window"
+    ],
+    "expected_omitted": [
+      "balance",
+      "open_route",
+      "outsourcing",
+      "priority_class",
+      "skill_matching",
+      "waiting_time"
+    ],
+    "expected_not_selected": [
+      "capacity"
+    ]
+  },
+  {
+    "id": "hhc_vip_priority_no_outsourcing",
+    "name": "VIP priority without outsourcing",
+    "problem": "Build a home health care routing model with VIP patients and ordinary patients. Minimize priority-weighted waiting time and travel time. Do not include outsourcing, skill matching, workload balance, or open routes.",
+    "expected_selected": [
+      "assignment",
+      "priority_class",
+      "routing_flow",
+      "time_propagation",
+      "waiting_time"
+    ],
+    "expected_omitted": [
+      "balance",
+      "open_route",
+      "outsourcing",
+      "skill_matching"
+    ],
+    "expected_not_selected": [
+      "capacity",
+      "time_window"
+    ]
+  },
+  {
+    "id": "hhc_workload_capacity_no_waiting",
+    "name": "Caregiver workload capacity",
+    "problem": "Build a home health care routing and scheduling model with caregiver workload limits and route duration capacity. Minimize travel time. Do not include waiting time, skill matching, outsourcing, VIP priority, workload balance, or open routes.",
+    "expected_selected": [
+      "assignment",
+      "capacity",
+      "routing_flow"
+    ],
+    "expected_omitted": [
+      "balance",
+      "open_route",
+      "outsourcing",
+      "priority_class",
+      "skill_matching",
+      "waiting_time"
+    ],
+    "expected_not_selected": [
+      "time_window"
+    ]
+  },
+  {
+    "id": "hhc_multi_objective_fairness",
+    "name": "Multi-objective HHC with fairness",
+    "problem": "Build a multi-objective home health care routing and scheduling model that trades off travel time, patient waiting time, and workload balance, with patient time windows and caregiver workload limits. Do not include outsourcing, skill matching, VIP priority, or open routes.",
+    "expected_selected": [
+      "assignment",
+      "balance",
+      "capacity",
+      "multi_objective",
+      "routing_flow",
+      "time_propagation",
+      "time_window",
+      "waiting_time"
+    ],
+    "expected_omitted": [
+      "open_route",
+      "outsourcing",
+      "priority_class",
+      "skill_matching"
+    ],
+    "expected_not_selected": []
+  },
+  {
+    "id": "hhc_closed_route_return_depot",
+    "name": "Closed-route depot return",
+    "problem": "Build a closed-route home health care routing model where caregivers must return to the depot after visits. Minimize travel time and patient waiting time. Do not include outsourcing, skill matching, VIP priority, workload balance, or time windows.",
+    "expected_selected": [
+      "assignment",
+      "routing_flow",
+      "time_propagation",
+      "waiting_time"
+    ],
+    "expected_omitted": [
+      "balance",
+      "open_route",
+      "outsourcing",
+      "priority_class",
+      "skill_matching",
+      "time_window"
+    ],
+    "expected_not_selected": [
+      "capacity"
+    ]
+  }
+]

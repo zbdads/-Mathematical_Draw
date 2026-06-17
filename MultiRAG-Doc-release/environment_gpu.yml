@@ -1,0 +1,36 @@
+name: multirag-doc-gpu
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pytorch>=2.0
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=12.1
+  - faiss-gpu
+  - sentence-transformers
+  - numpy<2
+  - pyyaml
+  - pip
+  - pip:
+      - docling
+      - pdfplumber
+      - pypdfium2
+      - pymupdf
+      - PyPDF2
+      - transformers
+      - accelerate
+      - peft
+      - Pillow
+      - pandas
+      - typer
+      - rich
+      - huggingface-hub
+      - openai
+      - python-dotenv
+      - opencv-python-headless
+      - langgraph
+      - langchain-core

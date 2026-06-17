@@ -1,0 +1,2382 @@
+<!DOCTYPE html>
+<html lang="zh" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MultiRAG-Doc</title>
+  <link rel="stylesheet" href="/styles.css?v=20260525-modeling-agent-1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+</head>
+
+<body class="h-full antialiased" x-data="app()" x-cloak :class="hasOpenOverlay() ? 'overflow-hidden' : ''" @keydown.escape.window="closeOverlays()">
+  <div class="app-shell min-h-full px-3 py-3 md:px-4 md:py-4 lg:px-5 lg:py-5">
+    <div class="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1600px] flex-col gap-4 lg:min-h-[calc(100vh-2.5rem)] lg:flex-row">
+      <aside class="lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:w-[290px] lg:flex-shrink-0 xl:w-[308px]">
+        <div class="sidebar-panel flex h-full flex-col rounded-[30px] p-4 md:p-5">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-soft)]">MultiRAG-Doc</div>
+              <div class="display-font mt-2 text-2xl font-semibold leading-tight text-[var(--text)]">Research Workspace</div>
+            </div>
+            <button
+              class="rounded-2xl border p-2 transition-all duration-200"
+              :class="debugMode
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-deep)]'
+                : 'border-[var(--line)] bg-white/50 text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--text)]'"
+              @click="toggleDebugMode()"
+              title="Debug Console"
+            >
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z" />
+              </svg>
+            </button>
+          </div>
+
+          <p class="mt-4 text-xs text-[var(--muted-soft)]">
+            POWERED BY
+          </p>
+          <p class="mt-1.5 text-xs text-[var(--muted-soft)]">
+            <a href="https://github.com/RainerSeventeen/MultiRAG-Doc" target="_blank" rel="noreferrer" class="transition-colors hover:text-[var(--accent)]">RainerSeventeen/MultiRAG-Doc</a>
+          </p>
+
+          <button
+            class="mt-5 flex items-center justify-between rounded-[22px] px-4 py-3 text-left ghost-button"
+            @click="newQuery()"
+          >
+            <span>
+              <span class="block text-sm font-semibold text-[var(--text)]">新建检索</span>
+              <span class="mt-0.5 block text-xs text-[var(--muted)]">回到 Query 并清空当前内容</span>
+            </span>
+            <svg class="h-5 w-5 text-[var(--accent-deep)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 5v14m7-7H5" />
+            </svg>
+          </button>
+
+          <div class="mt-6 space-y-2.5">
+            <button
+              class="nav-link w-full rounded-[24px] p-4 text-left"
+              :class="tab === 'query' ? 'nav-link-active' : ''"
+              @click="switchTab('query')"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold">Query</div>
+                  <div class="mt-1 text-xs leading-6 text-[var(--muted)]">基础 Query RAG 检索</div>
+                </div>
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 10h8m-8 4h5m-9 6h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </button>
+
+            <button
+              class="nav-link w-full rounded-[24px] p-4 text-left"
+              :class="tab === 'modeling' ? 'nav-link-active' : ''"
+              @click="switchTab('modeling')"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold">Modeling</div>
+                  <div class="mt-1 text-xs leading-6 text-[var(--muted)]">基于论文证据生成数学模型</div>
+                </div>
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4.5 19.5h15M6 15l3-3 2.5 2.5L16.5 8l1.5 2.25M6.75 5.25h10.5a1.5 1.5 0 011.5 1.5v10.5a1.5 1.5 0 01-1.5 1.5H6.75a1.5 1.5 0 01-1.5-1.5V6.75a1.5 1.5 0 011.5-1.5z" />
+                </svg>
+              </div>
+            </button>
+
+            <button
+              class="nav-link w-full rounded-[24px] p-4 text-left"
+              :class="tab === 'ingest' ? 'nav-link-active' : ''"
+              @click="switchTab('ingest')"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold">Ingest</div>
+                  <div class="mt-1 text-xs leading-6 text-[var(--muted)]">上传 PDF 以扩建知识库</div>
+                </div>
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 16V4m0 0l-4 4m4-4l4 4m4 8.5v1.75A1.75 1.75 0 0118.25 20h-12.5A1.75 1.75 0 014 18.25V16.5" />
+                </svg>
+              </div>
+            </button>
+
+            <!-- Agent Tab -->
+            <button
+              class="nav-link w-full rounded-[24px] p-4 text-left"
+              :class="tab === 'agent' ? 'nav-link-active' : ''"
+              @click="switchTab('agent')"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold">Agent</div>
+                  <div class="mt-1 text-xs leading-6 text-[var(--muted)]">Agent 驱动的检索生成系统</div>
+                </div>
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9.75 9.75h4.5m-7.5 4.5h10.5M12 3.75l6.5 3.75v7.5L12 18.75l-6.5-3.75V7.5L12 3.75z" />
+                </svg>
+              </div>
+            </button>
+          </div>
+
+          <div class="mt-6 grid grid-cols-2 gap-3">
+            <button
+              class="metric-card metric-button rounded-[22px] p-4"
+              :class="tab === 'papers' ? 'metric-button-active' : ''"
+              @click="switchTab('papers')"
+            >
+              <div class="text-[11px] uppercase tracking-[0.18em] text-[var(--muted-soft)]">Papers</div>
+              <div class="mt-2 text-2xl font-semibold text-[var(--text)]" x-text="paperIds.length"></div>
+            </button>
+            <div class="metric-card rounded-[22px] p-4">
+              <div class="text-[11px] uppercase tracking-[0.18em] text-[var(--muted-soft)]">Mode</div>
+              <div class="mt-2 text-sm font-semibold text-[var(--text)]" x-text="currentTabLabel()"></div>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <div class="min-w-0 flex-1">
+        <div class="workspace-panel min-h-[calc(100vh-1.5rem)] rounded-[34px] lg:min-h-[calc(100vh-2.5rem)]">
+          <!-- 模型状态横幅 -->
+          <div
+            x-show="modelStatus.state === 'loading' || modelStatus.state === 'error'"
+            class="flex items-center gap-3 border-b px-4 py-3 text-sm md:px-6 lg:px-8"
+            :class="modelStatus.state === 'error'
+              ? 'border-red-200/70 bg-red-50/80 text-red-800'
+              : 'border-amber-200/70 bg-amber-50/60 text-amber-800'"
+          >
+            <svg x-show="modelStatus.state === 'loading'" class="spinner h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <svg x-show="modelStatus.state === 'error'" class="h-4 w-4 flex-shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <span x-show="modelStatus.state === 'loading'">正在加载模型，请稍候…</span>
+            <span x-show="modelStatus.state === 'error'">
+              <span class="font-semibold">模型加载失败：</span><span x-text="modelStatus.message"></span>
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-4 border-b border-[var(--line)] px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 lg:px-8">
+            <div>
+              <div class="section-kicker">Workspace</div>
+              <div class="display-font mt-2 text-[1.8rem] font-semibold leading-tight md:text-[2rem]">Multi-modal research assistant</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <div class="toolbar-pill rounded-full px-3.5 py-2 text-xs font-medium" x-text="currentTabLabel()"></div>
+              <div class="toolbar-pill rounded-full px-3.5 py-2 text-xs font-medium" x-text="paperIds.length + ' papers indexed'"></div>
+              <div class="toolbar-pill rounded-full px-3.5 py-2 text-xs font-medium">Warm Claude-like shell</div>
+            </div>
+          </div>
+
+          <main class="px-4 pb-4 pt-5 md:px-6 md:pb-6 lg:px-8 lg:pb-8 lg:pt-7">
+            <template x-if="tab === 'papers'">
+              <section>
+              <div class="mx-auto max-w-5xl">
+                <div class="mb-6">
+                  <div class="section-kicker">Papers</div>
+                  <h2 class="display-font mt-4 text-4xl font-semibold leading-tight md:text-[2.85rem]">已索引论文列表</h2>
+                  <p class="mt-4 max-w-2xl text-sm leading-8 text-[var(--muted)] md:text-base">
+                    这里展示当前 workspace 中全部已入库的 paper_id，并把原始 slug 拆解成更容易扫读的标题、年份与结构标签。
+                  </p>
+                </div>
+
+                <div class="soft-card rounded-[30px] p-5 md:p-6" x-show="paperIds.length">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div class="section-kicker">Indexed Papers</div>
+                      <div class="mt-2 text-xl font-semibold text-[var(--text)]">Workspace library</div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <div class="toolbar-pill rounded-full px-3.5 py-2 text-xs font-medium" x-text="paperIds.length + ' papers'"></div>
+                      <div class="toolbar-pill rounded-full px-3.5 py-2 text-xs font-medium" x-text="filteredPaperIds().length + ' visible'"></div>
+                    </div>
+                  </div>
+
+                  <div class="mt-5 flex flex-col gap-4 border-b border-[var(--line)] pb-5 md:flex-row md:items-end md:justify-between">
+                    <div class="max-w-2xl">
+                      <div class="text-sm font-medium text-[var(--text)]">Compact library view</div>
+                      <p class="mt-2 text-sm leading-7 text-[var(--muted)]">
+                        查看所有已经加入向量检索库的文章。
+                      </p>
+                    </div>
+                    <label class="block w-full md:max-w-xs">
+                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Filter papers</span>
+                      <input
+                        class="input-base h-11 rounded-2xl px-4 text-sm"
+                        type="text"
+                        x-model.trim="papersFilter"
+                        placeholder="按 paper_id 筛选"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    <template x-for="(pid, index) in filteredPaperIds()" :key="pid">
+                      <div class="rounded-[18px] border border-[var(--line)] bg-white/42 px-3 py-2.5 transition-colors duration-200 hover:border-[var(--line-strong)] hover:bg-white/68">
+                        <div class="flex items-center gap-2.5">
+                          <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[11px] font-semibold text-[var(--accent-deep)]" x-text="index + 1"></div>
+                          <div class="min-w-0 flex-1 font-mono text-xs leading-6 text-[var(--text)] truncate" :title="pid" x-text="pid"></div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div class="mt-4 rounded-[24px] border border-dashed border-[var(--line)] bg-white/28 px-4 py-5 text-sm leading-7 text-[var(--muted)]" x-show="paperIds.length && !filteredPaperIds().length">
+                    当前筛选没有命中结果。可以尝试输入完整或部分 paper_id。
+                  </div>
+                </div>
+
+                <div class="rounded-[28px] border border-dashed border-[var(--line)] bg-white/32 px-5 py-8 text-sm leading-7 text-[var(--muted)]" x-show="!paperIds.length">
+                  还没有已索引论文。先切到 Ingest 上传 PDF，完成后这里会展示对应的 paper_id。
+                </div>
+              </div>
+              </section>
+            </template>
+
+            <template x-if="tab === 'query'">
+              <section>
+              <div class="mx-auto max-w-6xl">
+                <div class="text-center" x-show="showQueryIntro()">
+                  <div class="section-kicker">Query</div>
+                  <h1 class="display-font mx-auto mt-4 max-w-3xl text-4xl font-semibold leading-[1.25] md:text-5xl">
+                    文本、图像、表格、公式统一检索。
+                  </h1>
+                  <p class="mx-auto mt-4 max-w-2xl text-sm leading-8 text-[var(--muted)] md:text-base">
+                    原始 Query 输入的 RAG 召回系统，输入问题以开始检索。
+                  </p>
+                  <div class="mt-8 flex flex-wrap justify-center gap-2.5">
+                    <template x-for="prompt in querySuggestions" :key="prompt">
+                      <button class="chip-btn rounded-full px-4 py-2 text-sm" @click="setQuestion(prompt, 'query')" x-text="prompt"></button>
+                    </template>
+                  </div>
+                </div>
+
+                <div class="composer-card mt-8 rounded-[30px] p-4 md:p-5">
+                  <textarea
+                    class="composer-field min-h-[88px]"
+                    rows="3"
+                    placeholder="向 MultiRAG-Doc 提问，例如：什么是 RAG 系统？"
+                    x-model="q.question"
+                  ></textarea>
+
+                  <div class="mt-4 flex flex-col gap-3 border-t border-[var(--line)] pt-4 md:flex-row md:items-end md:justify-between">
+                    <div class="flex flex-1 flex-wrap items-end gap-2.5">
+                      <div class="w-full min-w-[88px] sm:w-[100px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Top-K</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          placeholder="自动"
+                          class="input-base h-10 rounded-2xl px-3 text-sm"
+                          x-model.number="q.top_k"
+                        />
+                      </div>
+
+                      <div class="w-full min-w-[180px] sm:w-[220px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">限定论文</label>
+                        <select class="select-base h-10 rounded-2xl px-3 text-sm" x-model="q.paper_id">
+                          <option value="">全库</option>
+                          <template x-for="pid in paperIds" :key="pid">
+                            <option :value="pid" x-text="pid"></option>
+                          </template>
+                        </select>
+                      </div>
+
+                      <div class="flex flex-wrap gap-2">
+                        <label class="flex cursor-pointer items-center">
+                          <input type="checkbox" class="sr-only" x-model="q.generate_answer" />
+                          <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="q.generate_answer ? 'control-pill-active' : ''">生成答案</span>
+                        </label>
+                        <label class="flex cursor-pointer items-center" x-show="q.generate_answer">
+                          <input type="checkbox" class="sr-only" x-model="q.stream" />
+                          <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="q.stream ? 'control-pill-active' : ''">流式返回</span>
+                        </label>
+                        <label class="flex cursor-pointer items-center">
+                          <input type="checkbox" class="sr-only" x-model="q.decompose" />
+                          <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="q.decompose ? 'control-pill-active' : ''">问题分解</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3 md:justify-end">
+                      <div class="text-xs leading-6 text-[var(--muted)]">Enter 换行，点击按钮发送</div>
+                      <button
+                        class="send-button flex h-12 w-12 items-center justify-center rounded-full"
+                        @click="runQuery"
+                        :disabled="q.loading || !q.question.trim()"
+                        aria-label="发送查询"
+                      >
+                        <svg x-show="!q.loading" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7-7 7" />
+                        </svg>
+                        <svg x-show="q.loading" class="spinner h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-6 rounded-[24px] border border-dashed border-[var(--line)] bg-white/32 px-4 py-3 text-sm text-[var(--muted)]" x-show="q.loading && !hasQueryOutput()">
+                  正在检索相关内容...
+                </div>
+
+                <!-- Answer placeholder: retrieval done, LLM generating -->
+                <div class="space-y-6 pt-7 fade-in"
+                  x-show="q.loading && q.generate_answer && (q.text_results.length || q.figure_results.length) && !q.streaming_text && !q.answer && !q.guardrail_reason">
+                  <div class="stream-loader mt-2" aria-label="正在生成答案">
+                    <div class="stream-loader-dot" aria-hidden="true"></div>
+                  </div>
+                </div>
+
+                <!-- Answer content: streaming or final -->
+                <div class="space-y-6 pt-7" x-show="q.answer || q.streaming_text || q.guardrail_reason">
+                  <div class="answer-card rounded-[30px] p-5 md:p-6 fade-in">
+                    <div class="flex flex-wrap items-center gap-3">
+                      <div class="section-kicker">Answer</div>
+                      <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-show="q.streaming_text && !q.answer">Streaming</div>
+                      <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-show="q.answer && q.answer.citations && q.answer.citations.length" x-text="(q.answer.citations || []).length + ' citations'"></div>
+                      <button
+                        type="button"
+                        class="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-white/45 px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition hover:border-[var(--line-strong)] hover:bg-white/70 hover:text-[var(--text)]"
+                        x-show="q.answer && q.answer.answer"
+                        @click="copyAnswerAsMarkdown('query')"
+                      >
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copy MD</span>
+                      </button>
+                    </div>
+
+                    <div x-show="q.guardrail_reason" class="mt-4 rounded-[22px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-7 text-amber-800" x-text="q.guardrail_reason"></div>
+
+                    <div class="streaming-cursor mt-4 text-sm leading-[1.8] text-[var(--text)] whitespace-pre-wrap"
+                      x-show="q.streaming_text && !q.answer"
+                      x-text="q.streaming_text"></div>
+
+                    <!-- Final answer: Markdown rendered -->
+                    <div class="answer-prose mt-5"
+                      x-show="q.answer && q.answer.answer"
+                      x-html="renderAnswer(q.answer)"></div>
+
+                    <div x-show="q.answer && q.answer.citations && q.answer.citations.length" class="mt-6 border-t border-[var(--line)] pt-5">
+                      <div class="section-kicker">Citations</div>
+                      <div class="mt-3 grid gap-2">
+                        <template x-for="(c, ci) in (q.answer && q.answer.citations || [])" :key="citationKey(c, ci)">
+                          <div class="result-card cursor-pointer rounded-2xl px-3 py-2.5 text-sm fade-in" @click="openCitation(c, ci)">
+                            <div class="flex items-center gap-3 min-w-0">
+                              <div class="min-w-0">
+                                <span class="flex-shrink-0 font-semibold text-[var(--accent-deep)]" x-text="'[' + (c.index || (ci + 1)) + ']'"></span>
+                                <span class="ml-2 text-[var(--muted)]" x-text="(c.paper_id || '') + (c.page ? ' · p.' + c.page : '')"></span>
+                              </div>
+                              <button
+                                type="button"
+                                class="citation-jump-btn ml-auto inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold"
+                                @click.stop="jumpToEvidence('query', c)"
+                              >跳到 Evidence</button>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Query Plan 区块：仅 decompose 模式且有 plan 时显示 -->
+                <div class="space-y-6 pt-7" x-show="q.decompose && q.plan && q.plan.intent">
+                  <div class="soft-card rounded-[30px] p-5 md:p-6 fade-in">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="section-kicker">Query Plan</div>
+                      <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs">Planner output</div>
+                    </div>
+
+                    <div class="mt-4 rounded-[24px] border border-[var(--line)] bg-white/45 p-4">
+                      <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Intent</div>
+                      <div class="mt-2 text-base leading-8 text-[var(--text)]" x-text="q.plan && q.plan.intent"></div>
+                    </div>
+
+                    <div class="mt-4" x-show="q.plan && q.plan.sub_queries && q.plan.sub_queries.length">
+                      <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Sub-queries</div>
+                      <div class="mt-3 flex flex-wrap gap-2.5">
+                        <template x-for="(sq, i) in (q.plan && q.plan.sub_queries || [])" :key="i">
+                          <span class="rounded-full border border-[rgba(197,109,71,0.22)] bg-[var(--accent-soft)] px-3 py-1.5 text-sm text-[var(--accent-deep)]" x-text="sq"></span>
+                        </template>
+                      </div>
+                    </div>
+
+                    <div class="mt-4" x-show="q.plan && q.plan.expected_evidence_types && q.plan.expected_evidence_types.length">
+                      <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Expected evidence</div>
+                      <div class="mt-3 flex flex-wrap gap-2">
+                        <template x-for="et in (q.plan && q.plan.expected_evidence_types || [])" :key="et">
+                          <span class="rounded-full border border-[var(--line)] bg-white/45 px-3 py-1.5 text-xs text-[var(--muted)]" x-text="et"></span>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-7 grid grid-cols-1 gap-5 xl:grid-cols-3" x-show="q.text_results.length || q.figure_results.length">
+                  <div class="space-y-4 xl:col-span-2" x-show="q.text_results.length">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="section-kicker">Evidence</div>
+                      <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-text="q.text_results.length + ' text hits'"></div>
+                    </div>
+
+                    <template x-for="(r, i) in q.text_results" :key="resultKey(r, 'query-text-' + i)">
+                      <div class="result-card cursor-pointer rounded-[28px] p-4 md:p-5 fade-in" :id="evidenceDomId('query', r, i)" @click="openResultModal(r, { title: 'Query Evidence', rank: r.rank || (i + 1) })">
+                        <div class="flex items-start gap-4">
+                          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-deep)]" x-text="r.rank || (i + 1)"></div>
+                          <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <span
+                                class="result-badge rounded-full px-2.5 py-1 text-xs font-medium"
+                                :class="{
+                                  'result-badge-text': r.modality === 'text',
+                                  'result-badge-table': r.modality === 'table',
+                                  'result-badge-equation': r.modality === 'equation',
+                                  'result-badge-default': !['text', 'table', 'equation'].includes(r.modality)
+                                }"
+                                x-text="r.modality || 'text'"
+                              ></span>
+                              <span class="text-xs text-[var(--muted)]" x-text="r.paper_id || ''"></span>
+                              <span class="text-xs text-[var(--muted-soft)]" x-show="r.page">p. <span x-text="r.page"></span></span>
+                              <span
+                                class="ml-auto text-xs text-[var(--muted-soft)]"
+                                x-text="primaryResultScore(r) != null ? primaryResultScoreLabel(r) + ': ' + formatScore(primaryResultScore(r), 4) : ''"
+                              ></span>
+                            </div>
+                            <div class="mt-3 text-sm leading-8 text-[var(--text)] content-clamp-compact" x-text="r.content || ''"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div class="space-y-5" x-show="q.figure_results.length">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="section-kicker">Figures</div>
+                      <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-text="q.figure_results.length + ' image hits'"></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                      <template x-for="(fig, i) in q.figure_results" :key="resultKey(fig, 'query-figure-' + i)">
+                        <div class="result-card cursor-pointer overflow-hidden rounded-[28px] fade-in" :id="evidenceDomId('query', fig, q.text_results.length + i)" @click="openImageModal(fig, { title: 'Query Figure', index: i })">
+                          <div class="relative">
+                            <img :src="fig.image_url" :alt="'检索结果图像 ' + (i + 1)" class="h-52 w-full object-cover bg-[var(--bg-strong)]" loading="lazy" />
+                            <div class="absolute right-3 top-3 rounded-full bg-[rgba(43,36,29,0.82)] px-2.5 py-1 text-xs text-[#fffaf6]"
+                              x-text="fig.score != null ? (fig.score.toFixed ? fig.score.toFixed(3) : fig.score) : ''"></div>
+                          </div>
+                          <div class="p-4">
+                            <div class="inline-flex rounded-full border result-badge result-badge-figure px-2.5 py-1 text-xs font-medium">figure</div>
+                            <p class="mt-3 text-sm leading-7 text-[var(--muted)] caption-clamp" x-text="fig.caption || fig.content || ''"></p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                              <template x-for="hp in (fig.hit_paths || [])" :key="hp">
+                                <span class="rounded-full border border-[var(--line)] bg-white/45 px-2.5 py-1 text-xs text-[var(--muted)]" x-text="hp"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </section>
+            </template>
+
+            <template x-if="tab === 'modeling'">
+              <section>
+              <div class="mx-auto max-w-7xl">
+                <div class="text-center" x-show="!mb.loading && !hasModelingOutput()">
+                  <div class="section-kicker">Modeling</div>
+                  <h1 class="display-font mx-auto mt-4 max-w-3xl text-4xl font-semibold leading-[1.25] md:text-5xl">
+                    从论文模型知识库生成数学建模草稿。
+                  </h1>
+                  <p class="mx-auto mt-4 max-w-2xl text-sm leading-8 text-[var(--muted)] md:text-base">
+                    输入实际优化问题，系统会先检索模型卡片、公式区域和相关图像，再生成结构化模型。
+                  </p>
+                  <div class="mt-8 flex flex-wrap justify-center gap-2.5">
+                    <template x-for="prompt in modelingSuggestions" :key="prompt">
+                      <button class="chip-btn rounded-full px-4 py-2 text-sm" @click="setQuestion(prompt, 'modeling')" x-text="prompt"></button>
+                    </template>
+                  </div>
+                </div>
+
+                <div class="composer-card mt-8 rounded-[30px] p-4 md:p-5" data-modeling-composer>
+                  <textarea
+                    class="composer-field min-h-[112px]"
+                    rows="4"
+                    placeholder="描述你的建模任务，例如：某工厂有多台机器和多个订单，需要决定订单分配和排序，目标是最小化加工成本和总延期。"
+                    x-model="mb.problem"
+                  ></textarea>
+
+                  <div class="mt-4 flex flex-col gap-3 border-t border-[var(--line)] pt-4 md:flex-row md:items-end md:justify-between">
+                    <div class="flex flex-1 flex-wrap items-end gap-2.5">
+                      <div class="w-full min-w-[88px] sm:w-[110px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Top-K</label>
+                        <input
+                          type="number"
+                          min="3"
+                          max="16"
+                          class="input-base h-10 rounded-2xl px-3 text-sm"
+                          x-model.number="mb.top_k"
+                        />
+                      </div>
+
+                      <div class="w-full min-w-[180px] sm:w-[240px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">限定论文</label>
+                        <select class="select-base h-10 rounded-2xl px-3 text-sm" x-model="mb.paper_id">
+                          <option value="">全库</option>
+                          <template x-for="pid in paperIds" :key="pid">
+                            <option :value="pid" x-text="pid"></option>
+                          </template>
+                        </select>
+                      </div>
+                      <label class="flex cursor-pointer items-center">
+                        <input type="checkbox" class="sr-only" x-model="mb.academic_mode" />
+                        <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="mb.academic_mode ? 'control-pill-active' : ''">论文级深度</span>
+                      </label>
+                      <div class="w-full min-w-[96px] sm:w-[120px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Agent 轮数</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="3"
+                          class="input-base h-10 rounded-2xl px-3 text-sm"
+                          x-model.number="mb.agent_max_rounds"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3 md:justify-end">
+                      <button
+                        type="button"
+                        class="inline-flex h-10 items-center justify-center rounded-2xl border border-[var(--line)] bg-white/52 px-4 text-sm font-medium text-[var(--muted)] transition hover:border-[var(--line-strong)] hover:bg-white/75 hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+                        @click="runHarnessDraft()"
+                        :disabled="!canRunModeling()"
+                      >Harness 草稿</button>
+                      <button
+                        type="button"
+                        class="inline-flex h-10 items-center justify-center rounded-2xl border border-[rgba(197,109,71,0.32)] bg-[var(--accent-soft)] px-4 text-sm font-medium text-[var(--accent-deep)] transition hover:border-[rgba(197,109,71,0.5)] hover:bg-white/75 disabled:cursor-not-allowed disabled:opacity-50"
+                        @click="runHarnessFormula()"
+                        :disabled="!canRunModeling()"
+                      >Harness 公式</button>
+                      <button
+                        class="send-button inline-flex h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-semibold"
+                        @click="runModeling()"
+                        :disabled="!canRunModeling()"
+                        aria-label="生成数学模型"
+                      >
+                        <span x-show="!mb.loading">完整生成</span>
+                        <span x-show="mb.loading">后台生成中</span>
+                        <svg x-show="!mb.loading" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7-7 7" />
+                        </svg>
+                        <svg x-show="mb.loading" class="spinner h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      </button>
+                      <button
+                        class="send-button inline-flex h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-semibold"
+                        @click="runModeling({ agentMode: true })"
+                        :disabled="!canRunModeling()"
+                        aria-label="Agent 生成数学模型"
+                      >
+                        <span x-show="!mb.loading">Agent 生成</span>
+                        <span x-show="mb.loading">Agent 运行中</span>
+                        <svg x-show="!mb.loading" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                        <svg x-show="mb.loading" class="spinner h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-6 rounded-[24px] border border-dashed border-[var(--line)] bg-white/32 px-4 py-3 text-sm leading-7 text-[var(--muted)]" x-show="mb.loading && !hasModelingOutput()">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span x-text="mb.job_message || '完整生成已进入后台任务，页面会自动刷新结果。'"></span>
+                    <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="mb.job_status" x-text="jobStatusLabel(mb.job_status)"></span>
+                    <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="mb.job_stage" x-text="mb.job_stage"></span>
+                    <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="mb.job_elapsed_seconds != null" x-text="'已等待 ' + formatElapsedSeconds(mb.job_elapsed_seconds)"></span>
+                    <button
+                      type="button"
+                      class="ml-auto inline-flex h-8 items-center rounded-full border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-700 transition hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-50"
+                      x-show="mb.job_id && !['done','error','cancelled'].includes(mb.job_status)"
+                      :disabled="mb.job_status === 'cancelling'"
+                      @click="cancelModelingJob()"
+                    >取消</button>
+                  </div>
+                  <div class="mt-3 h-2 overflow-hidden rounded-full bg-black/10" x-show="mb.job_id">
+                    <div class="h-full rounded-full bg-[var(--accent)] transition-all duration-300" :style="'width: ' + jobProgressPercent(mb.job_progress) + '%'"></div>
+                  </div>
+                  <div class="mt-1 font-mono text-xs text-[var(--muted-soft)]" x-show="mb.job_id" x-text="'job ' + mb.job_id"></div>
+                </div>
+
+                <div class="mt-4 rounded-[22px] border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm leading-7 text-amber-800" x-show="mb.academic_mode && !mb.loading">
+                  完整生成下，论文级深度会启用 blueprint 规划和更长输出；Agent 生成下，论文级深度会启用 Polisher Agent，仅增强论文级表达并保留已校验公式。
+                </div>
+
+                <div class="soft-card mt-6 rounded-[30px] p-5 md:p-6">
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                      <div class="section-kicker">HHC Eval</div>
+                      <div class="mt-2 text-sm leading-7 text-[var(--muted)]">一键运行居家医疗调度建模回归测试，检查组件选择、遗漏控制、公式骨架和 Verifier。</div>
+                    </div>
+                    <div class="flex flex-1 flex-wrap items-end gap-2.5 lg:justify-end">
+                      <div class="w-full min-w-[88px] sm:w-[110px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Top-K</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="16"
+                          class="input-base h-10 rounded-2xl px-3 text-sm"
+                          x-model.number="hhcEval.top_k"
+                        />
+                      </div>
+                      <div class="w-full min-w-[180px] sm:w-[220px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">限定论文</label>
+                        <select class="select-base h-10 rounded-2xl px-3 text-sm" x-model="hhcEval.paper_id">
+                          <option value="">全库</option>
+                          <template x-for="pid in paperIds" :key="'eval-paper-' + pid">
+                            <option :value="pid" x-text="pid"></option>
+                          </template>
+                        </select>
+                      </div>
+                      <label class="flex cursor-pointer items-center">
+                        <input type="checkbox" class="sr-only" x-model="hhcEval.save_report" />
+                        <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="hhcEval.save_report ? 'control-pill-active' : ''">保存报告</span>
+                      </label>
+                      <label class="flex cursor-pointer items-center">
+                        <input type="checkbox" class="sr-only" x-model="hhcEval.full_llm" />
+                        <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="hhcEval.full_llm ? 'control-pill-active' : ''">完整生成评测</span>
+                      </label>
+                      <label class="flex cursor-pointer items-center" x-show="hhcEval.full_llm">
+                        <input type="checkbox" class="sr-only" x-model="hhcEval.fast_llm_eval" />
+                        <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="hhcEval.fast_llm_eval ? 'control-pill-active' : ''">快检</span>
+                      </label>
+                      <div class="w-full min-w-[96px] sm:w-[120px]" x-show="hhcEval.full_llm">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Case 数</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="8"
+                          class="input-base h-10 rounded-2xl px-3 text-sm"
+                          x-model.number="hhcEval.limit_cases"
+                        />
+                      </div>
+                      <div class="w-full min-w-[200px] sm:w-[260px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Case ID</label>
+                        <input
+                          type="text"
+                          class="input-base h-10 rounded-2xl px-3 text-sm"
+                          placeholder="可选，逗号分隔"
+                          x-model="hhcEval.case_ids_text"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        class="send-button inline-flex h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-semibold"
+                        @click="runHhcEval()"
+                        :disabled="!canRunHhcEval()"
+                      >
+                        <span x-show="!hhcEval.loading">运行 HHC 评测</span>
+                        <span x-show="hhcEval.loading">后台评测中</span>
+                        <svg x-show="!hhcEval.loading" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7-7 7" />
+                        </svg>
+                        <svg x-show="hhcEval.loading" class="spinner h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 rounded-[22px] border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm leading-7 text-amber-800" x-show="hhcEval.full_llm">
+                    完整生成评测会调用大模型；默认只跑 1 个 case。开启快检时会使用较短超时和较少输出，适合调试结构。
+                  </div>
+                  <div class="mt-4 rounded-[22px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm leading-7 text-red-800" x-show="hhcEval.error_message" x-text="hhcEval.error_message"></div>
+                  <div class="mt-4 rounded-[22px] border border-dashed border-[var(--line)] bg-white/36 px-4 py-3 text-sm leading-7 text-[var(--muted)]" x-show="hhcEval.loading">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span x-text="hhcEval.job_message || 'HHC 评测已进入后台任务，完成后会自动展示报告。'"></span>
+                      <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="hhcEval.job_status" x-text="jobStatusLabel(hhcEval.job_status)"></span>
+                      <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="hhcEval.job_stage" x-text="hhcEval.job_stage"></span>
+                      <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="hhcEval.job_elapsed_seconds != null" x-text="'已等待 ' + formatElapsedSeconds(hhcEval.job_elapsed_seconds)"></span>
+                      <button
+                        type="button"
+                        class="ml-auto inline-flex h-8 items-center rounded-full border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-700 transition hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-50"
+                        x-show="hhcEval.job_id && !['done','error','cancelled'].includes(hhcEval.job_status)"
+                        :disabled="hhcEval.job_status === 'cancelling'"
+                        @click="cancelHhcEvalJob()"
+                      >取消</button>
+                    </div>
+                    <div class="mt-3 h-2 overflow-hidden rounded-full bg-black/10" x-show="hhcEval.job_id">
+                      <div class="h-full rounded-full bg-[var(--accent)] transition-all duration-300" :style="'width: ' + jobProgressPercent(hhcEval.job_progress) + '%'"></div>
+                    </div>
+                    <div class="mt-1 font-mono text-xs text-[var(--muted-soft)]" x-show="hhcEval.job_id" x-text="'job ' + hhcEval.job_id"></div>
+                  </div>
+
+                  <div class="mt-5" x-show="hhcEval.result">
+                    <div class="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Total</div>
+                        <div class="mt-2 text-2xl font-semibold text-[var(--text)]" x-text="hhcEvalSummary().total ?? 0"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Pass</div>
+                        <div class="mt-2 text-2xl font-semibold text-emerald-700" x-text="hhcEvalSummary().pass ?? 0"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Warn</div>
+                        <div class="mt-2 text-2xl font-semibold text-amber-700" x-text="hhcEvalSummary().warn ?? 0"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Fail</div>
+                        <div class="mt-2 text-2xl font-semibold text-red-700" x-text="hhcEvalSummary().fail ?? 0"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Error</div>
+                        <div class="mt-2 text-2xl font-semibold text-sky-700" x-text="hhcEvalSummary().error ?? 0"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Selector</div>
+                        <div class="mt-2 text-2xl font-semibold text-[var(--text)]" x-text="Number(hhcEvalSummary().selector_accuracy || 0).toFixed(2)"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Verifier</div>
+                        <div class="mt-2 text-2xl font-semibold text-[var(--text)]" x-text="Number(hhcEvalSummary().verifier_pass_rate || 0).toFixed(2)"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Model Comp</div>
+                        <div class="mt-2 text-2xl font-semibold text-[var(--text)]" x-text="Number(hhcEvalSummary().model_component_avg_score || 0).toFixed(2)"></div>
+                      </div>
+                      <div class="metric-card rounded-[20px] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Quality</div>
+                        <div class="mt-2 text-2xl font-semibold text-[var(--text)]" x-text="Number(hhcEvalSummary().quality_avg_score || 0).toFixed(2)"></div>
+                      </div>
+                    </div>
+
+                    <div class="mt-4 rounded-[18px] border border-[var(--line)] bg-white/45 px-4 py-3 text-sm leading-7 text-[var(--muted)]" x-show="hhcEvalOutputPath()">
+                      报告保存：<span class="font-mono text-[var(--text)]" x-text="hhcEvalOutputPath()"></span>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      <template x-for="record in hhcEvalRecords()" :key="record.id">
+                        <div class="rounded-[20px] border border-[var(--line)] bg-white/52 p-4">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span
+                              class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                              :class="hhcEvalStatusClass(record.status)"
+                              x-text="record.status"
+                            ></span>
+                            <div class="min-w-0 flex-1 text-sm font-semibold text-[var(--text)]" x-text="record.name || record.id"></div>
+                            <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-text="'selector ' + Number(record.selector_score || 0).toFixed(2)"></span>
+                            <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-text="'verifier ' + (record.verifier_status || '-')"></span>
+                            <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="record.quality_overall_score != null" x-text="'quality ' + Number(record.quality_overall_score || 0).toFixed(2)"></span>
+                          </div>
+                          <div class="mt-3 text-sm leading-6 text-[var(--muted)]" x-show="record.failure_reasons && record.failure_reasons.length" x-text="record.failure_reasons.join('; ')"></div>
+                          <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--muted)]">
+                            <div class="rounded-[14px] border border-[var(--line)] bg-white/50 px-3 py-2">
+                              Model component <span class="font-semibold text-[var(--text)]" x-text="Number(record.model_component_score || 0).toFixed(2)"></span>
+                            </div>
+                            <div class="rounded-[14px] border border-[var(--line)] bg-white/50 px-3 py-2">
+                              Constraints <span class="font-semibold text-[var(--text)]" x-text="record.constraint_count || 0"></span>
+                            </div>
+                          </div>
+                          <div class="mt-3 flex flex-wrap gap-1.5" x-show="record.missing_model_components && record.missing_model_components.length">
+                            <template x-for="component in (record.missing_model_components || [])" :key="record.id + '-miss-model-' + component">
+                              <span class="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] text-red-700" x-text="'missing ' + component"></span>
+                            </template>
+                          </div>
+                          <div class="mt-2 flex flex-wrap gap-1.5" x-show="record.unexpected_model_components && record.unexpected_model_components.length">
+                            <template x-for="component in (record.unexpected_model_components || [])" :key="record.id + '-unexpected-model-' + component">
+                              <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700" x-text="'unexpected ' + component"></span>
+                            </template>
+                          </div>
+                          <div class="mt-3 flex flex-wrap gap-1.5">
+                            <template x-for="component in (record.selected_components || [])" :key="record.id + '-sel-' + component">
+                              <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700" x-text="component"></span>
+                            </template>
+                          </div>
+                          <div class="mt-2 flex flex-wrap gap-1.5" x-show="record.omitted_components && record.omitted_components.length">
+                            <template x-for="component in (record.omitted_components || [])" :key="record.id + '-omit-' + component">
+                              <span class="rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600" x-text="component"></span>
+                            </template>
+                          </div>
+                          <div class="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              class="inline-flex h-8 items-center rounded-full border border-[var(--line)] bg-white/55 px-3 text-xs font-medium text-[var(--muted)] transition hover:border-[var(--line-strong)] hover:bg-white/80 hover:text-[var(--text)]"
+                              @click="loadHhcEvalRecord(record)"
+                            >载入问题</button>
+                            <button
+                              type="button"
+                              class="inline-flex h-8 items-center rounded-full border border-[rgba(197,109,71,0.28)] bg-[var(--accent-soft)] px-3 text-xs font-medium text-[var(--accent-deep)] transition hover:border-[rgba(197,109,71,0.44)] hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-50"
+                              :disabled="mb.loading || hhcEval.loading"
+                              @click="replayHhcEvalRecord(record, 'harness')"
+                            >Harness 回放</button>
+                            <button
+                              type="button"
+                              class="inline-flex h-8 items-center rounded-full border border-amber-200 bg-amber-50 px-3 text-xs font-medium text-amber-700 transition hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-50"
+                              :disabled="mb.loading || hhcEval.loading"
+                              @click="replayHhcEvalRecord(record, 'full')"
+                            >完整回放</button>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-7 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.3fr)_380px]" x-show="mb.model || mb.harness_draft || mb.raw_output || mb.parse_error || mb.error_message">
+                  <div class="space-y-5">
+                    <div class="answer-card rounded-[30px] p-5 md:p-6 fade-in">
+                      <div class="flex flex-wrap items-center gap-3">
+                        <div class="section-kicker">Generated Model</div>
+                        <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-show="mb.model && mb.model.confidence != null" x-text="'confidence ' + Number(mb.model.confidence).toFixed(2)"></div>
+                        <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-show="mb.skill" x-text="mb.skill"></div>
+                        <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-show="mb.generation_mode" x-text="mb.generation_mode"></div>
+                        <div class="ml-auto flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-[rgba(197,109,71,0.28)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] transition hover:border-[rgba(197,109,71,0.44)] hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-50"
+                            x-show="mb.model || mb.harness_draft"
+                            @click="runPlatemoCodegen()"
+                            :disabled="mb.platemo_loading"
+                          >
+                            <span x-show="!mb.platemo_loading">生成 PlatEMO</span>
+                            <span x-show="mb.platemo_loading">生成中</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-white/45 px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition hover:border-[var(--line-strong)] hover:bg-white/70 hover:text-[var(--text)]"
+                            x-show="mb.model"
+                            @click="copyModelJson()"
+                          >
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <span>Copy JSON</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div x-show="mb.error_message" class="mt-4 rounded-[22px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm leading-7 text-red-800" x-text="mb.error_message"></div>
+                      <div x-show="mb.parse_error" class="mt-4 rounded-[22px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-7 text-amber-800">
+                        <span class="font-semibold">JSON parse error: </span><span x-text="mb.parse_error"></span>
+                      </div>
+                      <div x-show="mb.revision_note" class="mt-4 rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm leading-7 text-emerald-800" x-text="mb.revision_note"></div>
+                      <div x-show="mb.warnings && mb.warnings.length" class="mt-4 space-y-2">
+                        <template x-for="(warning, i) in mb.warnings" :key="i">
+                          <div class="rounded-[18px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-7 text-amber-800" x-text="warning"></div>
+                        </template>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.model || mb.harness_draft || platemoCodeGeneration() || mb.code_generation_error">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">PlatEMO Code</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="platemoCodeGeneration() && platemoCodeGeneration().class_name" x-text="platemoCodeGeneration().class_name"></span>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="platemoCodeGeneration()" x-text="platemoCodeGeneration().written ? 'written' : 'preview'"></span>
+                          <button
+                            type="button"
+                            class="ml-auto inline-flex h-8 items-center rounded-full border border-[var(--line)] bg-white/55 px-3 text-xs font-medium text-[var(--muted)] transition hover:border-[var(--line-strong)] hover:bg-white/80 hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+                            x-show="platemoCodeGeneration() && platemoCodeGeneration().matlab_code"
+                            @click="copyPlatemoCode()"
+                          >Copy MATLAB</button>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                          <input
+                            type="text"
+                            class="input-base h-10 rounded-2xl px-3 text-sm"
+                            placeholder="PlatEMO root"
+                            x-model="mb.platemo_root"
+                          />
+                          <input
+                            type="text"
+                            class="input-base h-10 rounded-2xl px-3 text-sm"
+                            placeholder="MATLAB class"
+                            x-model="mb.platemo_class_name"
+                          />
+                        </div>
+                        <div x-show="mb.code_generation_error" class="mt-4 rounded-[18px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm leading-7 text-red-800" x-text="mb.code_generation_error"></div>
+                        <div x-show="platemoCodeGeneration() && platemoCodeGeneration().target_path" class="mt-4 rounded-[18px] border border-[var(--line)] bg-white/50 px-4 py-3 font-mono text-xs leading-6 text-[var(--muted)]" x-text="platemoCodeGeneration().target_path"></div>
+                        <div class="mt-3 flex flex-wrap gap-1.5" x-show="platemoCodeGeneration() && platemoCodeGeneration().component_map && platemoCodeGeneration().component_map.implemented">
+                          <template x-for="component in (platemoCodeGeneration().component_map.implemented || [])" :key="'platemo-impl-' + component">
+                            <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700" x-text="component"></span>
+                          </template>
+                        </div>
+                        <div class="mt-3 space-y-2" x-show="platemoCodeGeneration() && platemoCodeGeneration().warnings && platemoCodeGeneration().warnings.length">
+                          <template x-for="(warning, i) in (platemoCodeGeneration().warnings || [])" :key="'platemo-warning-' + i">
+                            <div class="rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-800" x-text="warning"></div>
+                          </template>
+                        </div>
+                        <pre class="mt-4 max-h-[520px] overflow-auto whitespace-pre rounded-[18px] bg-[rgba(43,36,29,0.92)] p-4 text-xs leading-6 text-stone-100" x-show="platemoCodeGeneration() && platemoCodeGeneration().matlab_code" x-text="platemoCodeGeneration().matlab_code"></pre>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="modelingAgentTrace().length || mb.agent_terminate_reason">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">Modeling Agent</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="mb.agent_terminate_reason" x-text="mb.agent_terminate_reason"></span>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="modelingAgentTrace().length" x-text="modelingAgentTrace().length + ' steps'"></span>
+                        </div>
+                        <div class="mt-4 space-y-3" x-show="modelingAgentTrace().length">
+                          <template x-for="step in modelingAgentTrace()" :key="'agent-step-' + step.iteration + '-' + step.action">
+                            <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-full border border-[rgba(197,109,71,0.24)] bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-deep)]" x-text="'round ' + step.iteration"></span>
+                                <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-text="step.action"></span>
+                                <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="step.verifier_status" x-text="'verifier ' + step.verifier_status"></span>
+                                <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="step.quality_score != null" x-text="'quality ' + Number(step.quality_score || 0).toFixed(2)"></span>
+                              </div>
+                              <div class="mt-2 text-sm leading-6 text-[var(--muted)]" x-text="step.message || ''"></div>
+                              <div
+                                class="mt-3 rounded-[16px] border px-3 py-2 text-xs"
+                                x-show="step.structure_audit"
+                                :class="step.structure_audit && step.structure_audit.formula_preserved ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'"
+                              >
+                                <span x-text="step.structure_audit && step.structure_audit.formula_preserved ? 'Structure audit: formulas preserved' : 'Structure audit: protected fields changed'"></span>
+                                <span x-show="step.structure_audit && step.structure_audit.constraint_count_after != null" x-text="' · constraints ' + step.structure_audit.constraint_count_before + ' → ' + step.structure_audit.constraint_count_after"></span>
+                                <span x-show="step.structure_audit && step.structure_audit.changed_fields && step.structure_audit.changed_fields.length" x-text="' · changed: ' + step.structure_audit.changed_fields.join(', ')"></span>
+                              </div>
+                              <div class="mt-3 flex flex-wrap gap-1.5" x-show="step.warnings && step.warnings.length">
+                                <template x-for="warning in (step.warnings || []).slice(0, 8)" :key="'agent-warning-' + step.iteration + warning">
+                                  <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700" x-text="warning"></span>
+                                </template>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="modelVerification()">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">Model Verifier</div>
+                          <span
+                            class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                            :class="verificationStatusClass(modelVerification() && modelVerification().status)"
+                            x-text="verificationStatusLabel(modelVerification() && modelVerification().status)"
+                          ></span>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="modelVerification() && modelVerification().score != null" x-text="'score ' + Number(modelVerification().score).toFixed(2)"></span>
+                        </div>
+                        <div class="mt-2 text-sm leading-7 text-[var(--muted)]" x-text="modelVerification() && modelVerification().summary"></div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2" x-show="verificationChecks().length">
+                          <template x-for="check in verificationChecks()" :key="check.name">
+                            <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                  class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                                  :class="verificationStatusClass(check.status)"
+                                  x-text="verificationStatusLabel(check.status)"
+                                ></span>
+                                <div class="min-w-0 flex-1 text-sm font-semibold text-[var(--text)]" x-text="check.name"></div>
+                              </div>
+                              <div class="mt-2 text-sm leading-6 text-[var(--muted)]" x-text="check.message || ''"></div>
+                              <div class="mt-2 flex flex-wrap gap-1.5" x-show="check.hits && check.hits.length">
+                                <template x-for="hit in check.hits" :key="check.name + '-hit-' + hit">
+                                  <span class="rounded-full border border-[var(--line)] bg-white/60 px-2 py-0.5 text-[11px] text-[var(--muted)]" x-text="hit"></span>
+                                </template>
+                              </div>
+                              <div class="mt-2 flex flex-wrap gap-1.5" x-show="check.symbols && check.symbols.length">
+                                <template x-for="symbol in check.symbols" :key="check.name + '-symbol-' + symbol">
+                                  <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700" x-text="symbol"></span>
+                                </template>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="modelQuality()">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">Quality Rubric</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="modelQuality() && modelQuality().status" x-text="modelQuality().status"></span>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="modelQuality() && modelQuality().overall_score != null" x-text="'overall ' + Number(modelQuality().overall_score || 0).toFixed(2)"></span>
+                        </div>
+                        <div class="mt-2 text-sm leading-7 text-[var(--muted)]" x-text="modelQuality() && modelQuality().summary"></div>
+                        <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4" x-show="modelQualityScores().length">
+                          <template x-for="item in modelQualityScores()" :key="'quality-' + item.name">
+                            <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                              <div class="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-soft)]" x-text="item.name.replaceAll('_', ' ')"></div>
+                              <div class="mt-2 text-xl font-semibold text-[var(--text)]" x-text="Number(item.score || 0).toFixed(2)"></div>
+                            </div>
+                          </template>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                          <div class="rounded-[18px] border border-amber-200/80 bg-amber-50/55 p-4" x-show="modelQuality() && modelQuality().issues && modelQuality().issues.length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Issues</div>
+                            <ul class="mt-3 space-y-2 text-sm leading-6 text-amber-800">
+                              <template x-for="item in (modelQuality() && modelQuality().issues || []).slice(0, 6)" :key="'quality-issue-' + item">
+                                <li class="flex gap-2"><span>•</span><span x-text="item"></span></li>
+                              </template>
+                            </ul>
+                          </div>
+                          <div class="rounded-[18px] border border-emerald-200/80 bg-emerald-50/55 p-4" x-show="modelQuality() && modelQuality().strengths && modelQuality().strengths.length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Strengths</div>
+                            <ul class="mt-3 space-y-2 text-sm leading-6 text-emerald-800">
+                              <template x-for="item in (modelQuality() && modelQuality().strengths || []).slice(0, 6)" :key="'quality-strength-' + item">
+                                <li class="flex gap-2"><span>•</span><span x-text="item"></span></li>
+                              </template>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2" x-show="mb.model && mb.model.problem_analysis">
+                        <div class="rounded-[24px] border border-[var(--line)] bg-white/45 p-4">
+                          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Problem Type</div>
+                          <div class="mt-2 text-base font-semibold leading-7 text-[var(--text)]" x-text="mb.model && mb.model.problem_analysis && mb.model.problem_analysis.problem_type"></div>
+                        </div>
+                        <div class="rounded-[24px] border border-[var(--line)] bg-white/45 p-4">
+                          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Objective Sense</div>
+                          <div class="mt-2 text-base font-semibold leading-7 text-[var(--text)]" x-text="mb.model && mb.model.objective && mb.model.objective.sense"></div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.model && mb.model.problem_analysis && (mb.model.problem_analysis.goals || []).length">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Goals</div>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                          <template x-for="goal in (mb.model && mb.model.problem_analysis && mb.model.problem_analysis.goals || [])" :key="goal">
+                            <span class="rounded-full border border-[rgba(197,109,71,0.22)] bg-[var(--accent-soft)] px-3 py-1.5 text-sm text-[var(--accent-deep)]" x-text="goal"></span>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.problem_spec">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">Problem Spec</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="problemSpec().domain" x-text="problemSpec().domain"></span>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="problemSpec().generation_depth" x-text="problemSpec().generation_depth"></span>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="problemSpec().model_type" x-text="problemSpec().model_type"></span>
+                        </div>
+                        <div class="mt-3 text-sm leading-7 text-[var(--muted)]" x-show="problemSpec().task_summary" x-text="problemSpec().task_summary"></div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Selected</div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                              <template x-for="item in problemSpecList('selected_components')" :key="'spec-selected-' + item">
+                                <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700" x-text="item"></span>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Forbidden</div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                              <template x-for="item in problemSpecList('forbidden_components')" :key="'spec-forbid-' + item">
+                                <span class="rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-xs text-stone-600" x-text="item"></span>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Missing Info</div>
+                            <ul class="mt-3 space-y-2 text-sm leading-6 text-[var(--muted)]">
+                              <template x-for="item in problemSpecList('missing_information').slice(0, 5)" :key="'spec-missing-' + item">
+                                <li class="flex gap-2"><span class="text-[var(--accent-deep)]">•</span><span x-text="item"></span></li>
+                              </template>
+                            </ul>
+                          </div>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="problemSpecList('required_objective_terms').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Objective Terms</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="item in problemSpecList('required_objective_terms')" :key="'spec-obj-' + item.name">
+                                <div class="text-sm leading-6">
+                                  <span class="font-semibold text-[var(--text)]" x-text="item.name"></span>
+                                  <div class="text-[var(--muted)]" x-text="item.description"></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="problemSpecList('required_constraint_groups').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Constraint Groups</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="item in problemSpecList('required_constraint_groups')" :key="'spec-con-' + item.name">
+                                <div class="text-sm leading-6">
+                                  <span class="font-semibold text-[var(--text)]" x-text="item.name"></span>
+                                  <div class="text-[var(--muted)]" x-text="item.purpose"></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.modeling_plan">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">Modeling Plan</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="mb.modeling_plan && mb.modeling_plan.expected_model_size" x-text="mb.modeling_plan.expected_model_size"></span>
+                        </div>
+                        <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Type</div>
+                            <div class="mt-2 text-sm font-semibold leading-7 text-[var(--text)]" x-text="mb.modeling_plan && mb.modeling_plan.problem_type"></div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Scope</div>
+                            <div class="mt-2 text-sm leading-7 text-[var(--muted)]" x-text="mb.modeling_plan && mb.modeling_plan.modeling_scope"></div>
+                          </div>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="modelingPlanList('component_decisions').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Decisions</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="(item, i) in modelingPlanList('component_decisions')" :key="'plan-decision-' + i">
+                                <div class="text-sm leading-6">
+                                  <span class="font-semibold text-[var(--text)]" x-text="item.decision + ': '"></span>
+                                  <span class="text-[var(--muted)]" x-text="item.component"></span>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="modelingPlanList('modeling_steps').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Steps</div>
+                            <ul class="mt-3 space-y-2 text-sm leading-6 text-[var(--muted)]">
+                              <template x-for="(item, i) in modelingPlanList('modeling_steps')" :key="'plan-step-' + i">
+                                <li><span class="font-semibold text-[var(--text)]" x-text="(i + 1) + '. '"></span><span x-text="item"></span></li>
+                              </template>
+                            </ul>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="modelingPlanList('quality_checks').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Checks</div>
+                            <ul class="mt-3 space-y-2 text-sm leading-6 text-[var(--muted)]">
+                              <template x-for="item in modelingPlanList('quality_checks')" :key="item">
+                                <li class="flex gap-2"><span class="text-[var(--accent-deep)]">•</span><span x-text="item"></span></li>
+                              </template>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.harness_draft">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">Harness Draft</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-text="mb.harness_draft && mb.harness_draft.mode"></span>
+                          <span
+                            class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                            :class="harnessValidation().status === 'ok' ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-amber-200 bg-amber-50 text-amber-700'"
+                            x-text="harnessValidation().status || 'draft'"
+                          ></span>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Operators</div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                              <template x-for="op in harnessSpecList('operators')" :key="op.name">
+                                <span class="model-evidence-chip rounded-full px-2.5 py-1 text-xs" x-text="op.name"></span>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Objective Terms</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="term in harnessSpecList('objective_terms')" :key="term.name">
+                                <div class="text-sm leading-6">
+                                  <span class="font-semibold text-[var(--text)]" x-text="term.name"></span>
+                                  <div class="text-[var(--muted)]" x-text="term.description"></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Validation</div>
+                            <div class="mt-3 text-sm leading-6 text-[var(--muted)]">
+                              <div x-text="'Defined symbols: ' + ((harnessValidation().defined_symbols || []).length)"></div>
+                              <div x-text="'Undefined symbols: ' + ((harnessValidation().undefined_symbols || []).length)"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="mt-4 rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="harnessComponentSelector().length">
+                          <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Component Selector</div>
+                              <div class="mt-1 text-sm leading-6 text-[var(--muted)]">Harness 生成公式前的组件选择过程</div>
+                            </div>
+                            <div class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-text="harnessComponentSelector().length + ' candidates'"></div>
+                          </div>
+                          <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            <template x-for="item in harnessComponentSelector()" :key="item.component">
+                              <div class="rounded-[16px] border border-[var(--line)] bg-white/50 p-3">
+                                <div class="flex flex-wrap items-center gap-2">
+                                  <span
+                                    class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                                    :class="componentStatusClass(item.status)"
+                                    x-text="componentStatusLabel(item.status)"
+                                  ></span>
+                                  <div class="min-w-0 flex-1 text-sm font-semibold text-[var(--text)]" x-text="item.label || item.component"></div>
+                                </div>
+                                <div class="mt-2 text-sm leading-6 text-[var(--muted)]" x-text="item.reason || ''"></div>
+                                <div class="mt-2 flex flex-wrap gap-1.5" x-show="item.prompt_signals && item.prompt_signals.length">
+                                  <template x-for="signal in item.prompt_signals" :key="item.component + '-signal-' + signal">
+                                    <span class="rounded-full border border-[var(--line)] bg-white/60 px-2 py-0.5 text-[11px] text-[var(--muted)]" x-text="signal"></span>
+                                  </template>
+                                </div>
+                                <div class="mt-2 font-mono text-[11px] text-[var(--muted-soft)]" x-text="sourceLabel(item.evidence_chunk_ids)"></div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Sets</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="item in harnessSymbolList('sets')" :key="item.symbol">
+                                <div class="text-sm leading-6"><span class="font-mono font-semibold text-[var(--text)]" x-text="item.symbol"></span><span class="text-[var(--muted)]" x-text="' · ' + item.description"></span></div>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Parameters</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="item in harnessSymbolList('parameters')" :key="item.symbol">
+                                <div class="text-sm leading-6"><span class="font-mono font-semibold text-[var(--text)]" x-text="item.symbol"></span><span class="text-[var(--muted)]" x-text="' · ' + item.description"></span></div>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Variables</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="item in harnessSymbolList('variables')" :key="item.symbol">
+                                <div class="text-sm leading-6"><span class="font-mono font-semibold text-[var(--text)]" x-text="item.symbol"></span><span class="text-[var(--muted)]" x-text="' · ' + item.description"></span></div>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="mt-4 rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="harnessSpecList('constraint_groups').length">
+                          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Constraint Groups</div>
+                          <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            <template x-for="group in harnessSpecList('constraint_groups')" :key="group.name">
+                              <div class="rounded-[16px] border border-[var(--line)] bg-white/50 p-3">
+                                <div class="text-sm font-semibold text-[var(--text)]" x-text="group.name"></div>
+                                <div class="mt-1 text-sm leading-6 text-[var(--muted)]" x-text="group.purpose"></div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.modeling_blueprint">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="section-kicker">Modeling Blueprint</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-show="mb.modeling_blueprint && mb.modeling_blueprint.formulation_type" x-text="mb.modeling_blueprint.formulation_type"></span>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="modelingBlueprintList('decision_variables').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Variables</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="(item, i) in modelingBlueprintList('decision_variables')" :key="'bp-var-' + i">
+                                <div class="text-sm leading-6">
+                                  <span class="font-semibold" :class="item.include ? 'text-[var(--text)]' : 'text-[var(--muted-soft)]'" x-text="(item.include ? 'use: ' : 'omit: ') + item.name"></span>
+                                  <div class="text-[var(--muted)]" x-text="item.role || item.reason || ''"></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="modelingBlueprintList('objective_terms').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Objective Terms</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="(item, i) in modelingBlueprintList('objective_terms')" :key="'bp-obj-' + i">
+                                <div class="text-sm leading-6">
+                                  <span class="font-semibold" :class="item.include ? 'text-[var(--text)]' : 'text-[var(--muted-soft)]'" x-text="(item.include ? 'use: ' : 'omit: ') + item.name"></span>
+                                  <div class="text-[var(--muted)]" x-text="item.role || item.reason || ''"></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="modelingBlueprintList('constraint_groups').length">
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Constraint Groups</div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="(item, i) in modelingBlueprintList('constraint_groups')" :key="'bp-con-' + i">
+                                <div class="text-sm leading-6">
+                                  <span class="font-semibold" :class="item.include ? 'text-[var(--text)]' : 'text-[var(--muted-soft)]'" x-text="(item.include ? 'use: ' : 'omit: ') + item.name"></span>
+                                  <div class="text-[var(--muted)]" x-text="item.role || item.reason || ''"></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="mt-4 rounded-[18px] border border-[var(--line)] bg-white/52 p-4" x-show="modelingBlueprintList('omitted_components').length">
+                          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Omitted Components</div>
+                          <div class="mt-3 flex flex-wrap gap-2">
+                            <template x-for="item in modelingBlueprintList('omitted_components')" :key="item">
+                              <span class="rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-xs text-stone-600" x-text="item"></span>
+                            </template>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="componentApplicabilityList().length">
+                        <div class="section-kicker">Component Applicability</div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                          <template x-for="(item, i) in componentApplicabilityList()" :key="'component-' + i">
+                            <div class="rounded-[18px] border border-[var(--line)] bg-white/52 p-4">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                  class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                                  :class="item.applicable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-stone-100 text-stone-600 border border-stone-200'"
+                                  x-text="item.applicable ? 'Used' : 'Omitted'"
+                                ></span>
+                                <div class="min-w-0 flex-1 text-sm font-semibold leading-6 text-[var(--text)]" x-text="item.component || 'Component'"></div>
+                              </div>
+                              <div class="mt-2 text-sm leading-7 text-[var(--muted)]" x-text="item.reason || ''"></div>
+                              <div class="mt-2 font-mono text-[11px] text-[var(--muted-soft)]" x-text="sourceLabel(item.source_chunk_ids)"></div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.model && mb.model.objective">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Objective</div>
+                          <span class="toolbar-pill rounded-full px-2.5 py-1 text-xs" x-text="sourceLabel(mb.model && mb.model.objective && mb.model.objective.source_chunk_ids)"></span>
+                        </div>
+                        <div class="model-formula mt-3 rounded-[18px] border border-[var(--line)] bg-white/58 px-4 py-3 text-sm leading-8" x-html="renderFormula(objectiveFormula())"></div>
+                        <div class="mt-3 text-sm leading-7 text-[var(--muted)]" x-text="mb.model && mb.model.objective && mb.model.objective.description"></div>
+                      </div>
+
+                      <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3" x-show="mb.model">
+                        <div class="rounded-[24px] border border-[var(--line)] bg-white/45 p-4">
+                          <div class="section-kicker">Sets</div>
+                          <div class="mt-3 space-y-3">
+                            <template x-for="(item, i) in modelFieldList('sets')" :key="'set-' + i">
+                              <div class="model-item">
+                                <div class="font-mono text-sm font-semibold text-[var(--text)]" x-text="item.symbol || ''"></div>
+                                <div class="mt-1 text-sm leading-7 text-[var(--muted)]" x-text="item.definition || item"></div>
+                                <div class="mt-1 font-mono text-[11px] text-[var(--muted-soft)]" x-text="sourceLabel(item.source_chunk_ids)"></div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+
+                        <div class="rounded-[24px] border border-[var(--line)] bg-white/45 p-4">
+                          <div class="section-kicker">Parameters</div>
+                          <div class="mt-3 space-y-3">
+                            <template x-for="(item, i) in modelFieldList('parameters')" :key="'param-' + i">
+                              <div class="model-item">
+                                <div class="font-mono text-sm font-semibold text-[var(--text)]" x-text="item.symbol || ''"></div>
+                                <div class="mt-1 text-sm leading-7 text-[var(--muted)]" x-text="item.definition || item"></div>
+                                <div class="mt-1 font-mono text-[11px] text-[var(--muted-soft)]" x-text="sourceLabel(item.source_chunk_ids)"></div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+
+                        <div class="rounded-[24px] border border-[var(--line)] bg-white/45 p-4">
+                          <div class="section-kicker">Variables</div>
+                          <div class="mt-3 space-y-3">
+                            <template x-for="(item, i) in modelFieldList('decision_variables')" :key="'var-' + i">
+                              <div class="model-item">
+                                <div class="font-mono text-sm font-semibold text-[var(--text)]" x-text="item.symbol || ''"></div>
+                                <div class="mt-1 text-sm leading-7 text-[var(--muted)]" x-text="item.definition || item"></div>
+                                <div class="mt-1 text-xs text-[var(--accent-deep)]" x-show="item.domain" x-text="item.domain"></div>
+                                <div class="mt-1 font-mono text-[11px] text-[var(--muted-soft)]" x-text="sourceLabel(item.source_chunk_ids)"></div>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="mb.model && modelFieldList('constraints').length">
+                        <div class="section-kicker">Constraints</div>
+                        <div class="mt-4 space-y-3">
+                          <template x-for="(item, i) in modelFieldList('constraints')" :key="'constraint-' + i">
+                            <div class="rounded-[20px] border border-[var(--line)] bg-white/52 p-4">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <div class="text-sm font-semibold text-[var(--text)]" x-text="(i + 1) + '. ' + (item.name || 'Constraint')"></div>
+                                <span class="toolbar-pill rounded-full px-2.5 py-1 text-[11px]" x-text="sourceLabel(item.source_chunk_ids)"></span>
+                              </div>
+                              <div class="model-formula mt-3 rounded-[16px] border border-[var(--line)] bg-white/62 px-3 py-2 text-sm leading-8" x-html="renderFormula(item.formula || '')"></div>
+                              <div class="mt-2 text-sm leading-7 text-[var(--muted)]" x-text="item.description || ''"></div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2" x-show="mb.model">
+                        <div class="rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="modelFieldList('assumptions').length">
+                          <div class="section-kicker">Assumptions</div>
+                          <ul class="mt-3 space-y-2 text-sm leading-7 text-[var(--muted)]">
+                            <template x-for="(item, i) in modelFieldList('assumptions')" :key="'assumption-' + i">
+                              <li class="flex gap-2"><span class="text-[var(--accent-deep)]">•</span><span x-text="item"></span></li>
+                            </template>
+                          </ul>
+                        </div>
+
+                        <div class="rounded-[24px] border border-[var(--line)] bg-white/45 p-4">
+                          <div class="section-kicker">Validation</div>
+                          <div class="mt-3 space-y-3 text-sm leading-7">
+                            <div x-show="validationList('undefined_symbols').length">
+                              <div class="font-semibold text-[var(--text)]">Undefined symbols</div>
+                              <div class="mt-1 flex flex-wrap gap-1.5">
+                                <template x-for="item in validationList('undefined_symbols')" :key="item">
+                                  <span class="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs text-red-700" x-text="item"></span>
+                                </template>
+                              </div>
+                            </div>
+                            <div x-show="validationList('potential_conflicts').length">
+                              <div class="font-semibold text-[var(--text)]">Potential conflicts</div>
+                              <ul class="mt-1 space-y-1 text-[var(--muted)]">
+                                <template x-for="item in validationList('potential_conflicts')" :key="item">
+                                  <li class="flex gap-2"><span class="text-amber-700">•</span><span x-text="item"></span></li>
+                                </template>
+                              </ul>
+                            </div>
+                            <div x-show="validationList('notes').length">
+                              <div class="font-semibold text-[var(--text)]">Notes</div>
+                              <ul class="mt-1 space-y-1 text-[var(--muted)]">
+                                <template x-for="item in validationList('notes')" :key="item">
+                                  <li class="flex gap-2"><span class="text-[var(--accent-deep)]">•</span><span x-text="item"></span></li>
+                                </template>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/45 p-4" x-show="!mb.model && mb.raw_output">
+                        <div class="section-kicker">Raw Output</div>
+                        <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-[18px] bg-[rgba(43,36,29,0.92)] p-4 text-xs leading-6 text-stone-100" x-text="mb.raw_output"></pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="space-y-5">
+                    <div class="soft-card rounded-[30px] p-5 md:p-6" x-show="mb.model && mb.model.reference_models && mb.model.reference_models.length">
+                      <div class="section-kicker">Reference Models</div>
+                      <div class="mt-4 space-y-3">
+                        <template x-for="(ref, i) in (mb.model && mb.model.reference_models || [])" :key="'ref-' + i">
+                          <div class="rounded-[20px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="font-mono text-sm font-semibold text-[var(--text)]" x-text="ref.paper_id + ' / ' + ref.chunk_id"></div>
+                            <div class="mt-3 flex flex-wrap gap-1.5">
+                              <template x-for="part in (ref.reusable_parts || [])" :key="part">
+                                <span class="rounded-full border border-[var(--line)] bg-white/48 px-2.5 py-1 text-xs text-[var(--muted)]" x-text="part"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+
+                    <div class="soft-card rounded-[30px] p-5 md:p-6" x-show="modelingEvidence().length">
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="section-kicker">Retrieved Evidence</div>
+                        <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-text="modelingEvidence().length + ' hits'"></div>
+                      </div>
+                      <div class="mt-4 space-y-3">
+                        <template x-for="(item, i) in modelingEvidence()" :key="resultKey(item, 'modeling-' + i)">
+                          <div
+                            class="result-card cursor-pointer rounded-[22px] p-3"
+                            :id="evidenceDomId('modeling', item, i)"
+                            @click="item.modality === 'figure' && item.image_url ? openImageModal(item, { title: 'Modeling Evidence', index: i }) : openResultModal(item, { title: 'Modeling Evidence', rank: item.rank || (i + 1) })"
+                          >
+                            <div class="flex items-start gap-3">
+                              <img x-show="item.modality === 'figure' && item.image_url" :src="item.image_url" class="h-14 w-14 flex-shrink-0 rounded-[14px] bg-[var(--bg-strong)] object-cover" loading="lazy" />
+                              <div x-show="item.modality !== 'figure'" class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-deep)]" x-text="item.rank || (i + 1)"></div>
+                              <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                  <span class="result-badge rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="{
+                                      'result-badge-text': item.modality === 'text' || item.modality === 'math_model' || item.modality === 'model_region',
+                                      'result-badge-figure': item.modality === 'figure',
+                                      'result-badge-table': item.modality === 'table',
+                                      'result-badge-equation': item.modality === 'equation',
+                                      'result-badge-default': !['text','math_model','model_region','figure','table','equation'].includes(item.modality),
+                                    }"
+                                    x-text="item.modality || 'text'"></span>
+                                  <span class="text-xs text-[var(--muted)]" x-text="item.paper_id"></span>
+                                  <span class="ml-auto text-xs text-[var(--muted-soft)]" x-text="primaryResultScore(item) != null ? formatScore(primaryResultScore(item), 4) : ''"></span>
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-1.5" x-show="modelEvidenceTags(item).length">
+                                  <template x-for="tag in modelEvidenceTags(item)" :key="tag">
+                                    <span class="model-evidence-chip rounded-full px-2 py-0.5 text-[11px]" x-text="tag"></span>
+                                  </template>
+                                </div>
+                                <div class="mt-1.5 text-xs leading-6 text-[var(--muted)] content-clamp-compact" x-text="item.content || item.caption || ''"></div>
+                              </div>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </section>
+            </template>
+
+            <template x-if="tab === 'ingest'">
+              <section>
+              <div class="mx-auto max-w-5xl">
+                <div class="mb-6">
+                  <div class="section-kicker">Ingest</div>
+                  <h2 class="display-font mt-4 text-4xl font-semibold leading-tight md:text-[2.85rem]">上传一篇论文，建立知识库索引。</h2>
+                  <p class="mt-4 max-w-2xl text-sm leading-8 text-[var(--muted)] md:text-base">
+                    文件入库接口，可选择是否启动多模态入库。
+                  </p>
+                </div>
+
+                <div class="space-y-5">
+                  <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    <div class="soft-card rounded-[30px] p-5 md:p-6">
+                      <div class="flex items-center justify-between gap-3">
+                        <div>
+                          <div class="section-kicker">Upload</div>
+                          <div class="mt-2 text-xl font-semibold">Drop PDF here</div>
+                        </div>
+                        <button class="ghost-button rounded-full px-4 py-2 text-sm" @click="$refs.fileInput.click()">选择文件</button>
+                      </div>
+
+                      <div
+                        class="mt-5 rounded-[28px] border-2 border-dashed px-6 py-12 text-center transition-colors"
+                        :class="ing.dragging ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white/28'"
+                        @dragover.prevent="ing.dragging = true"
+                        @dragleave.prevent="ing.dragging = false"
+                        @drop.prevent="handleFileDrop($event)"
+                      >
+                        <input type="file" accept=".pdf" class="hidden" x-ref="fileInput" @change="handleFileSelect($event)" />
+                        <svg class="mx-auto h-12 w-12 text-[var(--muted-soft)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <div class="mt-4 text-base font-semibold text-[var(--text)]">拖拽 PDF 到这里</div>
+                        <div class="mt-2 text-sm text-[var(--muted)]">或点击按钮，从本地选择一篇论文。</div>
+                        <div x-show="ing.file" class="mt-4 rounded-full border border-[var(--line)] bg-white/48 px-4 py-2 text-sm text-[var(--accent-deep)]">
+                          当前文件：<span x-text="ing.file && ing.file.name"></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="soft-card rounded-[30px] p-5 md:p-6">
+                      <div class="section-kicker">Config</div>
+                      <div class="mt-4 space-y-4">
+                        <div>
+                          <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Paper ID</label>
+                          <input
+                            class="input-base h-10 rounded-2xl px-3 text-sm"
+                            placeholder="例如：Attention_2017"
+                            x-model="ing.paper_id"
+                          />
+                        </div>
+
+                        <div class="flex flex-wrap gap-2.5">
+                          <label class="flex cursor-pointer items-center gap-2.5">
+                            <input type="checkbox" class="sr-only" x-model="ing.multimodal" />
+                            <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="ing.multimodal ? 'control-pill-active' : ''">多模态解析</span>
+                          </label>
+
+                          <label class="flex cursor-pointer items-center gap-2.5">
+                            <input type="checkbox" class="sr-only" x-model="ing.use_caption_model" />
+                            <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="ing.use_caption_model ? 'control-pill-active' : ''">Caption 增强</span>
+                          </label>
+
+                          <label class="flex cursor-pointer items-center gap-2.5">
+                            <input type="checkbox" class="sr-only" x-model="ing.overwrite" />
+                            <span class="control-pill flex h-10 items-center rounded-full px-4 text-sm" :class="ing.overwrite ? 'control-pill-active' : ''">清空重建索引</span>
+                          </label>
+                        </div>
+
+                        <button
+                          class="send-button inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold"
+                          @click="startIngest"
+                          :disabled="ing.loading || !ing.file || !ing.paper_id.trim()"
+                        >
+                          <svg x-show="ing.loading" class="spinner h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                          </svg>
+                          <span>开始入库</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="soft-card rounded-[30px] p-5 md:p-6" x-show="ing.loading || ing.events.length">
+                    <div class="section-kicker">Progress</div>
+                    <div class="mt-5 flex gap-2">
+                      <template x-for="n in [1, 2, 3, 4]" :key="n">
+                        <div class="flex-1">
+                          <div class="h-2 rounded-full transition-all duration-500"
+                            :class="ing.step_num >= n ? 'bg-[var(--accent)]' : 'bg-[rgba(111,100,88,0.16)]'"></div>
+                          <div class="mt-2 text-center text-xs text-[var(--muted)]" x-text="['解析', '分块', '向量化', '建索引'][n - 1]"></div>
+                        </div>
+                      </template>
+                    </div>
+
+                    <div class="log-area mt-5 h-52 overflow-y-auto rounded-[24px] border border-[var(--line)] bg-[rgba(43,36,29,0.94)] p-4 text-xs text-stone-200">
+                      <template x-for="(ev, i) in ing.events" :key="i">
+                        <div class="mb-1" :class="ev.type === 'error' ? 'text-red-300' : ev.type === 'done' ? 'text-emerald-300' : 'text-stone-200'" x-text="ev._log"></div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <div class="soft-card rounded-[30px] p-5 md:p-6 fade-in" x-show="ing.result">
+                    <div class="section-kicker">Summary</div>
+                    <div class="mt-4 flex gap-3">
+                      <template x-for="[k, v] in Object.entries(ing.result || {}).filter(([,v]) => v !== null)" :key="k">
+                        <div class="metric-card flex-1 rounded-[22px] p-4 text-center">
+                          <div class="text-2xl font-semibold text-[var(--text)]" x-text="v"></div>
+                          <div class="mt-1 text-xs text-[var(--muted)]" x-text="{'pages':'页数','text_chunks':'文本 chunk','figure_chunks':'图像 chunk','text_dim':'文本向量维度','image_dim':'图像向量维度','text_index_total':'文本索引总量（累计）','figures_indexed':'图像索引入库数'}[k] || k"></div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </section>
+            </template>
+
+            <!-- Agent Tab: Agentic RAG Loop with Timeline -->
+            <template x-if="tab === 'agent'">
+              <section>
+              <div class="mx-auto max-w-6xl">
+
+                <!-- Intro (idle + no nodes) -->
+                <div class="text-center" x-show="ag.status === 'idle' && !ag.nodes.length">
+                  <div class="section-kicker">Agent</div>
+                  <h2 class="display-font mx-auto mt-4 max-w-3xl text-4xl font-semibold leading-[1.25] md:text-5xl">
+                    探索复杂问题，组织证据与引用。
+                  </h2>
+                  <p class="mx-auto mt-4 max-w-2xl text-sm leading-8 text-[var(--muted)] md:text-base">
+                    LLM 驱动的 搜索查询分析 Agent Research.
+                  </p>
+                  <div class="mt-8 flex flex-wrap justify-center gap-2.5">
+                    <template x-for="prompt in agentSuggestions" :key="prompt">
+                      <button class="chip-btn rounded-full px-4 py-2 text-sm" @click="setQuestion(prompt, 'agent')" x-text="prompt"></button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Composer -->
+                <div class="composer-card mt-8 rounded-[30px] p-4 md:p-5">
+                  <textarea
+                    class="composer-field min-h-[88px]"
+                    rows="3"
+                    placeholder="例如：调查一下 GPT 123 三代, 每一代都优化了什么?"
+                    x-model="ag.question"
+                  ></textarea>
+                  <div class="mt-4 flex flex-col gap-3 border-t border-[var(--line)] pt-4 md:flex-row md:items-end md:justify-between">
+                    <div class="flex flex-1 flex-wrap items-end gap-2.5">
+                      <div class="w-full min-w-[180px] sm:w-[220px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">限定论文</label>
+                        <select class="select-base h-10 rounded-2xl px-3 text-sm" x-model="ag.paper_id">
+                          <option value="">全库</option>
+                          <template x-for="pid in paperIds" :key="pid">
+                            <option :value="pid" x-text="pid"></option>
+                          </template>
+                        </select>
+                      </div>
+                      <div class="w-full min-w-[88px] sm:w-[110px]">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Max Steps</label>
+                        <input type="number" min="1" max="16" class="input-base h-10 rounded-2xl px-3 text-sm" x-model.number="ag.max_steps" />
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-3 md:justify-end">
+                      <button
+                        x-show="ag.status === 'running'"
+                        class="flex h-10 items-center rounded-full border border-[var(--line)] bg-white/45 px-4 text-sm text-[var(--muted)] transition hover:border-[var(--line-strong)] hover:bg-white/70"
+                        @click="abortAgent()"
+                      >中止</button>
+                      <div class="text-xs leading-6 text-[var(--muted)]" x-show="ag.status !== 'running'">Enter 换行，点击按钮发送</div>
+                      <button
+                        class="send-button flex h-12 w-12 items-center justify-center rounded-full"
+                        @click="runAgent()"
+                        :disabled="ag.status === 'running' || !ag.question.trim()"
+                        aria-label="发送 Agent 查询"
+                      >
+                        <svg x-show="ag.status !== 'running'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7-7 7" />
+                        </svg>
+                        <svg x-show="ag.status === 'running'" class="spinner h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 状态徽章 + Budget 条 -->
+                <div class="mt-4 flex flex-wrap items-center gap-3" x-show="ag.status !== 'idle'">
+                  <div class="toolbar-pill rounded-full px-3.5 py-2 text-xs font-medium"
+                    :class="{
+                      'text-amber-700': ag.status === 'running',
+                      'text-emerald-700': ag.status === 'done',
+                      'text-[var(--muted)]': ag.status === 'aborted',
+                      'text-red-700': ag.status === 'error',
+                    }"
+                  >
+                    <span x-show="ag.status === 'running'" class="flex items-center gap-1.5">
+                      <svg class="spinner h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                      <span x-text="'Agent Running · Step ' + ag.step_count"></span>
+                    </span>
+                    <span x-show="ag.status === 'done'" x-text="'Done · ' + ag.step_count + ' steps'"></span>
+                    <span x-show="ag.status === 'aborted'">Cancelled</span>
+                    <span x-show="ag.status === 'error'" x-text="'Error: ' + ag.error_message"></span>
+                  </div>
+                  <div class="flex items-center gap-2" x-show="ag.budget_cap !== null">
+                    <span class="text-xs text-[var(--muted-soft)]">Evidence Budget</span>
+                    <div class="h-1.5 w-24 overflow-hidden rounded-full bg-[rgba(111,100,88,0.18)]">
+                      <div class="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
+                        :style="'width:' + (ag.budget_cap > 0 ? Math.min(100, ag.budget_used / ag.budget_cap * 100) : 0) + '%'"
+                      ></div>
+                    </div>
+                    <span class="text-xs text-[var(--muted)]" x-text="ag.budget_used + ' / ' + ag.budget_cap"></span>
+                  </div>
+                </div>
+
+                <!-- 双栏布局：Timeline + 详情 Panel -->
+                <div class="mt-6 lg:flex lg:items-start lg:gap-6" x-show="ag.nodes.length">
+
+                  <!-- 移动端：横向步进条 -->
+                  <div class="mb-4 lg:hidden">
+                    <div class="flex gap-2 overflow-x-auto pb-2">
+                      <template x-for="node in ag.nodes.filter(n => n.type !== 'step_group')" :key="node.id">
+                        <button
+                          class="flex flex-shrink-0 flex-col items-center gap-1 rounded-2xl border px-3 py-2 text-xs transition"
+                          :class="ag.selected_node_id === node.id ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-deep)]' : 'border-[var(--line)] bg-white/40 text-[var(--muted)]'"
+                          @click="selectNode(node.id)"
+                        >
+                          <span x-html="agNodeIcon(node)"></span>
+                          <span x-text="agNodeShortLabel(node)"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- 桌面端：左侧 Timeline -->
+                  <div class="hidden lg:block lg:w-[30%] lg:flex-shrink-0">
+                    <div class="soft-card rounded-[30px] p-4">
+                      <div class="mb-3 flex items-center justify-between gap-2">
+                        <div class="section-kicker">Timeline</div>
+                        <button
+                          x-show="!ag.auto_follow && ag.nodes.length"
+                          class="rounded-full border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--accent-deep)] transition hover:bg-[var(--accent-soft)]"
+                          @click="ag.auto_follow = true; selectNode(ag.nodes.filter(n=>n.type!=='step_group').at(-1)?.id)"
+                        >跟随最新 →</button>
+                      </div>
+                      <div class="space-y-0.5 max-h-[calc(100vh-14rem)] overflow-y-auto">
+                        <template x-for="node in ag.nodes" :key="node.id">
+                          <div>
+                            <!-- Step 组标题 -->
+                            <div
+                              x-show="node.type === 'step_group'"
+                              class="mt-3 mb-0.5 px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]"
+                              x-text="'Step ' + (node.step + 1)"
+                            ></div>
+                            <!-- 节点按钮 -->
+                            <button
+                              x-show="node.type !== 'step_group'"
+                              class="agent-timeline-node w-full rounded-2xl px-3 py-2 text-left transition"
+                              :class="{
+                                'nav-link-active': ag.selected_node_id === node.id,
+                                'pl-7': node.indented,
+                              }"
+                              @click="selectNode(node.id)"
+                            >
+                              <div class="flex items-center gap-2.5 min-w-0">
+                                <span class="flex-shrink-0" x-html="agNodeIcon(node)"></span>
+                                <div class="min-w-0 flex-1">
+                                  <div class="text-sm font-medium text-[var(--text)] truncate" x-text="agNodeLabel(node)"></div>
+                                  <div class="mt-0.5 truncate text-xs text-[var(--muted)]" x-show="node.subtitle" x-text="node.subtitle"></div>
+                                </div>
+                              </div>
+                            </button>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 右侧详情 Panel -->
+                  <div class="lg:flex-1 min-w-0">
+                    <div x-show="ag.selected_node_id && agSelectedNode()" class="soft-card rounded-[30px] p-5 md:p-6 fade-in">
+
+                      <!-- plan_query -->
+                      <div x-show="agSelectedNode() && agSelectedNode().type === 'plan_query'">
+                        <div class="section-kicker">Plan Query · Step 0</div>
+                        <h3 class="mt-2 text-xl font-semibold text-[var(--text)]">Question Planning</h3>
+                        <div class="mt-5 space-y-4">
+                          <div class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Original Question</div>
+                            <div class="mt-2 text-sm leading-7 text-[var(--text)]" x-text="agSelectedNode() && ('「' + agSelectedNode().data.original_question + '」')"></div>
+                          </div>
+                          <div class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Normalized Question</div>
+                            <div class="mt-2 text-sm leading-7 text-[var(--text)]" x-text="agSelectedNode() && ('「' + agSelectedNode().data.normalized_question + '」')"></div>
+                          </div>
+                          <div x-show="agSelectedNode() && agSelectedNode().data.sub_queries && agSelectedNode().data.sub_queries.length">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]" x-text="agSelectedNode() && ('Sub-Queries (' + (agSelectedNode().data.sub_queries || []).length + ' items)')"></div>
+                            <div class="mt-3 space-y-2">
+                              <template x-for="(sq, i) in (agSelectedNode() && agSelectedNode().data.sub_queries || [])" :key="i">
+                                <div class="flex gap-2 text-sm text-[var(--text)]">
+                                  <span class="flex-shrink-0 font-semibold text-[var(--accent-deep)]" x-text="(i + 1) + '.'"></span>
+                                  <span x-text="sq"></span>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- decide_action -->
+                      <div x-show="agSelectedNode() && agSelectedNode().type === 'decide_action'">
+                        <div class="section-kicker" x-text="agSelectedNode() && ('Decide Action · Step ' + (agSelectedNode().data.step + 1))"></div>
+                        <h3 class="mt-2 text-xl font-semibold text-[var(--text)]">LLM Decision</h3>
+                        <div class="mt-5 space-y-4">
+                          <div class="flex items-center gap-3">
+                            <span class="text-sm text-[var(--muted-soft)]">Action:</span>
+                            <span class="rounded-full px-3 py-1 text-xs font-semibold"
+                              :class="{
+                                'bg-blue-100 text-blue-700': agSelectedNode() && agSelectedNode().data.action === 'search_evidence',
+                                'bg-green-100 text-green-700': agSelectedNode() && agSelectedNode().data.action === 'finish',
+                                'bg-red-100 text-red-700': agSelectedNode() && agSelectedNode().data.action === 'abort',
+                                'bg-[var(--accent-soft)] text-[var(--accent-deep)]': agSelectedNode() && !['search_evidence','finish','abort'].includes(agSelectedNode().data.action),
+                              }"
+                              x-text="agSelectedNode() && agSelectedNode().data.action"
+                            ></span>
+                          </div>
+                          <div x-show="agSelectedNode() && agSelectedNode().data.action === 'search_evidence'"
+                            class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4 space-y-2">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Arguments</div>
+                            <div class="grid gap-2 text-sm">
+                              <div class="flex gap-2">
+                                <span class="w-24 flex-shrink-0 text-[var(--muted-soft)]">Query:</span>
+                                <span class="text-[var(--text)]" x-text="agSelectedNode() && agSelectedNode().data.args && ('&quot;' + agSelectedNode().data.args.query + '&quot;')"></span>
+                              </div>
+                              <div class="flex gap-2" x-show="agSelectedNode() && agSelectedNode().data.args && agSelectedNode().data.args.modalities">
+                                <span class="w-24 flex-shrink-0 text-[var(--muted-soft)]">Modalities:</span>
+                                <span class="text-[var(--text)]" x-text="agSelectedNode() && agSelectedNode().data.args && agSelectedNode().data.args.modalities"></span>
+                              </div>
+                            </div>
+                          </div>
+                          <div x-show="agSelectedNode() && agSelectedNode().data.reasoning"
+                            class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Reasoning</div>
+                            <div class="mt-2 text-sm italic leading-7 text-[var(--muted)]" x-text="agSelectedNode() && agSelectedNode().data.reasoning"></div>
+                          </div>
+                          <div x-show="agSelectedNode() && agSelectedNode().data.state_update && Object.keys(agSelectedNode().data.state_update || {}).length"
+                            class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4 space-y-2">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">State Update</div>
+                            <div class="space-y-1.5 text-sm">
+                              <div class="flex gap-2" x-show="agSelectedNode() && agSelectedNode().data.state_update && agSelectedNode().data.state_update.current_objective">
+                                <span class="flex-shrink-0 text-[var(--muted-soft)]">Objective:</span>
+                                <span class="text-[var(--text)]" x-text="agSelectedNode() && agSelectedNode().data.state_update && agSelectedNode().data.state_update.current_objective"></span>
+                              </div>
+                              <div x-show="agSelectedNode() && agSelectedNode().data.state_update && (agSelectedNode().data.state_update.open_questions || []).length">
+                                <span class="text-[var(--muted-soft)]">Open Questions:</span>
+                                <ul class="mt-1 space-y-1">
+                                  <template x-for="(oq, i) in (agSelectedNode() && agSelectedNode().data.state_update && agSelectedNode().data.state_update.open_questions || [])" :key="i">
+                                    <li class="flex gap-1.5 text-[var(--text)]"><span class="text-[var(--accent-deep)]">·</span><span x-text="oq"></span></li>
+                                  </template>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- run_tool -->
+                      <div x-show="agSelectedNode() && agSelectedNode().type === 'run_tool'">
+                        <div class="section-kicker" x-text="agSelectedNode() && ('Run Tool · Step ' + (agSelectedNode().data.step + 1))"></div>
+                        <h3 class="mt-2 text-xl font-semibold text-[var(--text)]">Retrieval Observation</h3>
+                        <div class="mt-5 space-y-4">
+                          <div class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Query</div>
+                            <div class="mt-2 text-sm leading-7 text-[var(--text)]" x-text="agSelectedNode() && ('&quot;' + agSelectedNode().data.query + '&quot;')"></div>
+                          </div>
+                          <div class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Summary</div>
+                            <div class="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+                              <div><span class="text-[var(--muted-soft)]">New Evidence: </span><span class="font-medium" x-text="agSelectedNode() && agSelectedNode().data.new_evidence_count"></span></div>
+                              <div><span class="text-[var(--muted-soft)]">Total: </span><span class="font-medium" x-text="agSelectedNode() && (agSelectedNode().data.total_evidence + ' / ' + agSelectedNode().data.cap)"></span></div>
+                              <div><span class="text-[var(--muted-soft)]">Budget left: </span><span class="font-medium" x-text="agSelectedNode() && agSelectedNode().data.budget_remaining"></span></div>
+                              <div class="col-span-2 sm:col-span-3" x-show="agSelectedNode() && (agSelectedNode().data.papers_hit || []).length">
+                                <span class="text-[var(--muted-soft)]">Papers: </span><span class="font-medium" x-text="agSelectedNode() && (agSelectedNode().data.papers_hit || []).join(', ')"></span>
+                              </div>
+                            </div>
+                          </div>
+                          <div x-show="agSelectedNode() && (agSelectedNode().data.new_items || []).length">
+                            <div class="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]"
+                              x-text="agSelectedNode() && ('Evidence Retrieved (' + (agSelectedNode().data.new_items || []).length + ' items)')"></div>
+                            <div class="space-y-2">
+                              <template x-for="(item, i) in (agSelectedNode() && agSelectedNode().data.new_items || [])" :key="item.chunk_id || i">
+                                <div class="result-card cursor-pointer rounded-[22px] p-3"
+                                  @click="item.modality === 'figure' && item.image_url ? openImageModal(item, { title: 'Agent Evidence', index: i }) : openResultModal(item, { title: 'Agent Evidence', rank: i + 1 })">
+                                  <div class="flex items-start gap-3">
+                                    <img x-show="item.modality === 'figure' && item.image_url" :src="item.image_url" class="h-14 w-14 flex-shrink-0 rounded-[14px] object-cover bg-[var(--bg-strong)]" loading="lazy" />
+                                    <div x-show="item.modality !== 'figure'" class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-deep)]" x-text="i + 1"></div>
+                                    <div class="min-w-0 flex-1">
+                                      <div class="flex flex-wrap items-center gap-1.5">
+                                        <span class="result-badge rounded-full px-2 py-0.5 text-xs font-medium"
+                                          :class="{
+                                            'result-badge-text': item.modality === 'text',
+                                            'result-badge-figure': item.modality === 'figure',
+                                            'result-badge-table': item.modality === 'table',
+                                            'result-badge-equation': item.modality === 'equation',
+                                            'result-badge-default': !['text','figure','table','equation'].includes(item.modality),
+                                          }"
+                                          x-text="item.modality || 'text'"></span>
+                                        <span class="text-xs text-[var(--muted)]" x-text="item.paper_id"></span>
+                                        <span class="text-xs text-[var(--muted-soft)]" x-show="item.page">p. <span x-text="item.page"></span></span>
+                                        <span class="ml-auto text-xs text-[var(--muted-soft)]" x-text="item.score != null ? 'score ' + Number(item.score).toFixed(4) : ''"></span>
+                                      </div>
+                                      <div class="mt-1.5 text-xs leading-6 text-[var(--muted)] content-clamp-compact" x-text="item.content_preview || item.content"></div>
+                                      <div class="mt-1 text-xs italic text-[var(--muted-soft)]" x-show="item.modality === 'figure' && item.caption" x-text="item.caption"></div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- compress_evidence -->
+                      <div x-show="agSelectedNode() && agSelectedNode().type === 'compress_evidence'">
+                        <div class="section-kicker" x-text="agSelectedNode() && ('Compress Evidence · Step ' + (agSelectedNode().data.step + 1))"></div>
+                        <h3 class="mt-2 text-xl font-semibold text-[var(--text)]">Evidence Compression</h3>
+                        <div class="mt-5 space-y-4">
+                          <div class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Summary</div>
+                            <div class="mt-3 grid grid-cols-3 gap-2 text-sm">
+                              <div><span class="text-[var(--muted-soft)]">Before: </span><span class="font-medium" x-text="agSelectedNode() && agSelectedNode().data.before"></span></div>
+                              <div><span class="text-[var(--muted-soft)]">Kept: </span><span class="font-medium" x-text="agSelectedNode() && agSelectedNode().data.kept"></span></div>
+                              <div><span class="text-[var(--muted-soft)]">Discarded: </span><span class="font-medium" x-text="agSelectedNode() && (agSelectedNode().data.discarded || []).length"></span></div>
+                            </div>
+                          </div>
+                          <div x-show="agSelectedNode() && agSelectedNode().data.fallback"
+                            class="rounded-[18px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+                            Fallback: score-based pruning (LLM parse failed)
+                          </div>
+                          <div x-show="agSelectedNode() && agSelectedNode().data.reasoning"
+                            class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Reasoning</div>
+                            <div class="mt-2 text-sm italic leading-7 text-[var(--muted)]" x-text="agSelectedNode() && agSelectedNode().data.reasoning"></div>
+                          </div>
+                          <div x-show="agSelectedNode() && (agSelectedNode().data.discarded || []).length">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Discarded Chunk IDs</div>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                              <template x-for="(cid, i) in (agSelectedNode() && agSelectedNode().data.discarded || [])" :key="i">
+                                <span class="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs text-red-700 font-mono" x-text="cid"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- answer_start -->
+                      <div x-show="agSelectedNode() && agSelectedNode().type === 'answer_start'">
+                        <div class="section-kicker">Answer Start</div>
+                        <h3 class="mt-2 text-xl font-semibold text-[var(--text)]">Generation Phase</h3>
+                        <div class="mt-5 space-y-4">
+                          <div class="rounded-[22px] border border-[var(--line)] bg-white/45 p-4">
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                              <div><span class="text-[var(--muted-soft)]">Selected Evidence: </span><span class="font-medium" x-text="agSelectedNode() && agSelectedNode().data.selected_evidence_count"></span></div>
+                              <div><span class="text-[var(--muted-soft)]">Terminate Reason: </span><span class="font-medium" x-text="agSelectedNode() && (agSelectedNode().data.terminate_reason || 'llm_finish')"></span></div>
+                            </div>
+                          </div>
+                          <div x-show="agSelectedNode() && (agSelectedNode().data.warnings || []).length" class="space-y-2">
+                            <template x-for="(w, i) in (agSelectedNode() && agSelectedNode().data.warnings || [])" :key="i">
+                              <div class="rounded-[18px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-7 text-amber-800">
+                                <span class="font-semibold" x-text="w.code + ': '"></span><span x-text="w.message"></span>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 默认占位 -->
+                      <div x-show="!agSelectedNode() || !['plan_query','decide_action','run_tool','compress_evidence','answer_start'].includes(agSelectedNode().type)"
+                        class="py-8 text-center text-sm text-[var(--muted)]">
+                        选择 Timeline 节点可查看执行详情。
+                      </div>
+                    </div>
+
+                    <div x-show="!ag.selected_node_id || !agSelectedNode()" class="soft-card rounded-[30px] p-8 text-center text-sm text-[var(--muted)]">
+                      点击 Timeline 节点可查看执行详情。
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 最终回答区 -->
+                <div class="mt-6" x-show="ag.streaming_text || ag.answer || ag.guardrail_reason">
+                  <div class="answer-card rounded-[30px] p-5 md:p-6 fade-in">
+                    <div class="flex flex-wrap items-center gap-3">
+                      <div class="section-kicker">Agent Answer</div>
+                      <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs" x-show="ag.streaming_text && !ag.answer">Streaming</div>
+                      <div class="toolbar-pill rounded-full px-3 py-1.5 text-xs"
+                        x-show="ag.answer && ag.answer.citations && ag.answer.citations.length"
+                        x-text="(ag.answer && ag.answer.citations || []).length + ' citations'"></div>
+                      <button
+                        type="button"
+                        class="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-white/45 px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition hover:border-[var(--line-strong)] hover:bg-white/70 hover:text-[var(--text)]"
+                        x-show="ag.answer && ag.answer.answer"
+                        @click="copyAnswerAsMarkdown('agent')"
+                      >
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copy MD</span>
+                      </button>
+                    </div>
+
+                    <div x-show="ag.warnings && ag.warnings.length" class="mt-4 space-y-2">
+                      <template x-for="(w, i) in ag.warnings" :key="i">
+                        <div class="rounded-[18px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-7 text-amber-800">
+                          <span class="font-semibold" x-text="'⚠ ' + w.code + ': '"></span><span x-text="w.message"></span>
+                        </div>
+                      </template>
+                    </div>
+
+                    <div x-show="ag.guardrail_reason" class="mt-4 rounded-[22px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-7 text-amber-800">
+                      <span class="font-semibold">拒答原因：</span><span x-text="ag.guardrail_reason"></span>
+                    </div>
+
+                    <div class="streaming-cursor mt-4 text-sm leading-[1.8] text-[var(--text)] whitespace-pre-wrap"
+                      x-show="ag.streaming_text && !ag.answer"
+                      x-text="ag.streaming_text"></div>
+
+                    <div class="answer-prose mt-5"
+                      x-show="ag.answer && ag.answer.answer"
+                      x-html="renderAnswer(ag.answer)"></div>
+
+                    <div x-show="ag.answer && ag.answer.citations && ag.answer.citations.length" class="mt-6 border-t border-[var(--line)] pt-5">
+                      <div class="section-kicker">Citations</div>
+                      <div class="mt-3 grid gap-2">
+                        <template x-for="(c, ci) in (ag.answer && ag.answer.citations || [])" :key="citationKey(c, ci)">
+                          <div class="result-card cursor-pointer rounded-2xl px-3 py-2.5 text-sm" @click="openCitation(c, ci)">
+                            <div class="flex items-center gap-3 min-w-0">
+                              <div class="min-w-0">
+                                <span class="flex-shrink-0 font-semibold text-[var(--accent-deep)]" x-text="'[' + (c.index || (ci + 1)) + ']'"></span>
+                                <span class="ml-2 text-[var(--muted)]" x-text="(c.paper_id || '') + (c.page ? ' · p.' + c.page : '')"></span>
+                              </div>
+                              <button
+                                type="button"
+                                class="citation-jump-btn ml-auto inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold"
+                                @click.stop="jumpToEvidence('agent', c)"
+                              >跳到 Evidence</button>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+              </section>
+            </template>
+          </main>
+        </div>
+      </div>
+
+      <!-- ── /workspace ──────────────────────────────────────────────── -->
+    </div>
+  </div>
+
+  <!-- ── Debug Panel (fixed overlay，不影响主内容布局) ──────────────── -->
+  <div
+    x-show="debugMode"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 translate-x-4"
+    x-transition:enter-end="opacity-100 translate-x-0"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 translate-x-0"
+    x-transition:leave-end="opacity-0 translate-x-4"
+    class="debug-drawer fixed right-4 top-4 z-50 flex flex-col rounded-[26px] overflow-hidden transition-[width] duration-200"
+    style="height: calc(100vh - 2rem);"
+    :class="debugCollapsed ? 'w-[44px]' : 'w-[420px]'"
+  >
+        <!-- ── 折叠条（collapsed strip）── -->
+        <div
+          x-show="debugCollapsed"
+          class="flex h-full cursor-pointer flex-col items-center gap-3 py-5"
+          @click="debugCollapsed = false"
+          title="展开 Debug Console"
+        >
+          <svg class="h-4 w-4 flex-shrink-0 text-[#c47d55]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z" />
+          </svg>
+          <div class="flex-1 flex items-center">
+            <span class="text-[10px] font-bold uppercase tracking-[0.25em] text-[#8a7a6a]"
+              style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg)">Debug</span>
+          </div>
+          <div x-show="debugEvents.length > 0"
+            class="flex h-5 w-5 items-center justify-center rounded-full bg-[#c47d55]/20 text-[10px] font-bold text-[#c47d55]"
+            x-text="debugEvents.length > 9 ? '9+' : debugEvents.length"
+          ></div>
+        </div>
+
+        <!-- ── 展开面板（expanded panel）── -->
+        <div x-show="!debugCollapsed" class="flex h-full flex-col overflow-hidden">
+
+          <!-- Header -->
+          <div class="flex flex-shrink-0 items-center justify-between border-b border-black/8 px-4 py-3.5">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <svg class="h-3.5 w-3.5 flex-shrink-0 text-[#c47d55]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z" />
+              </svg>
+              <span class="text-[11px] font-bold uppercase tracking-[0.2em] text-[#6a5a4a]">Debug Console</span>
+              <span class="rounded-full bg-black/6 px-2 py-0.5 text-[10px] text-[#8a7a6a]" x-text="currentTabLabel()"></span>
+            </div>
+            <div class="flex flex-shrink-0 items-center gap-1.5">
+              <button
+                x-show="debugEvents.length > 0"
+                class="rounded-lg border border-black/8 bg-black/5 px-2.5 py-1 text-[10px] text-[#8a7a6a] transition hover:bg-black/8 hover:text-[#5a4a3a]"
+                @click="debugEvents = []"
+              >Clear</button>
+              <!-- X = 折叠 -->
+              <button
+                class="rounded-lg border border-black/8 bg-black/5 p-1.5 text-[#8a7a6a] transition hover:bg-black/8 hover:text-[#5a4a3a]"
+                @click="debugCollapsed = true"
+                title="折叠"
+              >
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div x-show="debugEvents.length === 0" class="flex flex-1 flex-col items-center justify-center px-7 py-10 text-center">
+            <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-black/5">
+              <svg class="h-5 w-5 text-[#b0a090]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z" />
+              </svg>
+            </div>
+            <div class="text-sm font-semibold text-[#5a4a3a]">等待第一次查询…</div>
+            <p class="mt-2 text-xs leading-6 text-[#8a7a6a]">运行 Query / Decompose / Agent 后，LLM prompt、原始输出、检索分数等信息将实时出现在这里。</p>
+            <div class="mt-5 w-full space-y-2 text-left opacity-30">
+              <div class="h-5 w-full rounded-lg bg-black/5"></div>
+              <div class="h-5 w-4/5 rounded-lg bg-black/5"></div>
+              <div class="h-5 w-3/5 rounded-lg bg-black/5"></div>
+            </div>
+          </div>
+
+          <!-- Events list -->
+          <div x-show="debugEvents.length > 0" class="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+            <template x-for="(ev, i) in debugEvents" :key="i">
+              <div class="debug-event-card rounded-[14px] border border-black/8 overflow-hidden" x-data="{ open: ev._defaultOpen ?? false }">
+                <button
+                  class="flex w-full items-center gap-2 px-3.5 py-2.5 text-left transition hover:bg-black/5"
+                  @click="open = !open"
+                >
+                  <span
+                    class="flex-shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                    :class="{
+                      'bg-blue-100 text-blue-700': ev.type === 'debug_llm',
+                      'bg-purple-100 text-purple-700': ev.type === 'plan',
+                      'bg-emerald-100 text-emerald-700': ev.type === 'retrieval',
+                      'bg-amber-100 text-amber-700': ev.type === 'answer_prompt',
+                      'bg-black/6 text-[#7a6a5a]': !['debug_llm','plan','retrieval','answer_prompt'].includes(ev.type),
+                    }"
+                    x-text="ev.type"
+                  ></span>
+                  <span class="flex-1 truncate text-xs text-[#6a5a4a]" x-text="ev.label || ev.call_id || ''"></span>
+                  <span class="flex-shrink-0 font-mono text-[10px] text-[#b0a898]" x-text="ev._ts || ''"></span>
+                  <svg class="h-3 w-3 flex-shrink-0 text-[#c0b8b0] transition-transform duration-150" :class="open ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                <div x-show="open" x-transition.opacity.duration.100ms class="border-t border-black/8 px-3.5 py-3 space-y-2.5">
+                  <!-- debug_llm / answer_prompt: messages + raw output -->
+                  <template x-if="ev.type === 'debug_llm' || ev.type === 'answer_prompt'">
+                    <div class="space-y-2.5">
+                      <template x-for="(msg, mi) in (ev.prompt || [])" :key="mi">
+                        <div x-data="{ msgOpen: msg.role === 'user' }">
+                          <button class="flex w-full items-center gap-2 text-left" @click="msgOpen = !msgOpen">
+                            <span
+                              class="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase"
+                              :class="msg.role === 'system' ? 'bg-slate-200 text-slate-600' : 'bg-sky-100 text-sky-700'"
+                              x-text="msg.role"
+                            ></span>
+                            <span class="flex-1 truncate font-mono text-[10px] text-[#8a7a6a]"
+                              x-text="String(msg.content || '').slice(0, 55) + (String(msg.content || '').length > 55 ? '…' : '')"
+                            ></span>
+                            <svg class="h-3 w-3 flex-shrink-0 text-[#c0b8b0] transition-transform" :class="msgOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          <div x-show="msgOpen" class="mt-1.5 max-h-44 overflow-y-auto rounded-xl bg-black/5 p-3 font-mono text-[11px] leading-5 text-[#3a2a1a] whitespace-pre-wrap" x-text="msg.content"></div>
+                        </div>
+                      </template>
+                      <div x-show="ev.raw_output">
+                        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#8a7a6a]">Raw Output</div>
+                        <div class="max-h-32 overflow-y-auto rounded-xl bg-black/5 p-3 font-mono text-[11px] leading-5 text-[#1a5a1a] whitespace-pre-wrap" x-text="ev.raw_output"></div>
+                      </div>
+                    </div>
+                  </template>
+                  <!-- other events: JSON dump -->
+                  <template x-if="ev.type !== 'debug_llm' && ev.type !== 'answer_prompt'">
+                    <div class="max-h-44 overflow-y-auto rounded-xl bg-black/5 p-3 font-mono text-[11px] leading-5 text-[#3a2a1a] whitespace-pre-wrap"
+                      x-text="JSON.stringify(ev._data ?? {}, null, 2)"
+                    ></div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Footer：退出 Debug -->
+          <div class="flex flex-shrink-0 items-center justify-between border-t border-black/8 px-4 py-3">
+            <span class="font-mono text-[10px] text-[#b0a898]" x-text="debugEvents.length + ' events'"></span>
+            <button
+              class="rounded-xl border border-[#c47d55]/30 bg-[#c47d55]/8 px-3 py-1.5 text-[11px] font-semibold text-[#c47d55]/70 transition hover:border-[#c47d55]/60 hover:bg-[#c47d55]/15 hover:text-[#c47d55]"
+              @click="debugMode = false"
+            >退出 Debug</button>
+          </div>
+
+        </div>
+      </div>
+  <!-- ── /Debug Panel ──────────────────────────────────────────────── -->
+
+  <div
+    class="modal-backdrop flex items-center justify-center p-3 md:p-6"
+    x-show="resultModal.open"
+    x-transition.opacity.duration.180ms
+    @click.self="closeResultModal()"
+  >
+    <div class="modal-panel w-full max-w-4xl rounded-[30px] p-5 md:p-6">
+      <div class="flex items-start justify-between gap-4 border-b border-[var(--line)] pb-4">
+        <div class="min-w-0">
+          <div class="section-kicker" x-text="resultModal.title || 'Result Detail'"></div>
+          <div class="mt-2 text-xl font-semibold text-[var(--text)]" x-text="resultModal.result && (resultModal.result.paper_id || 'unknown paper')"></div>
+          <div class="mt-2 flex flex-wrap gap-2 text-xs text-[var(--muted)]" x-show="resultModal.result">
+            <span class="toolbar-pill rounded-full px-3 py-1.5" x-show="resultModal.rank">rank <span x-text="resultModal.rank"></span></span>
+            <span class="toolbar-pill rounded-full px-3 py-1.5" x-show="resultModal.result && resultModal.result.modality" x-text="resultModal.result && resultModal.result.modality"></span>
+            <span class="toolbar-pill rounded-full px-3 py-1.5" x-show="resultModal.result && resultModal.result.page">p. <span x-text="resultModal.result && resultModal.result.page"></span></span>
+            <span
+              class="toolbar-pill rounded-full px-3 py-1.5"
+              x-show="primaryResultScore(resultModal.result) != null"
+              x-text="primaryResultScoreLabel(resultModal.result) + ' ' + formatScore(primaryResultScore(resultModal.result), 4)"
+            ></span>
+          </div>
+        </div>
+        <button class="ghost-button flex h-10 w-10 items-center justify-center rounded-full" @click="closeResultModal()" aria-label="关闭详情">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="mt-5 max-h-[70vh] overflow-y-auto pr-1">
+        <div x-show="resultModal.result && resultModal.result.source_query" class="mb-4 rounded-[22px] border border-[rgba(197,109,71,0.18)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent-deep)]">
+          <span class="font-semibold">sub-query:</span>
+          <span x-text="resultModal.result && resultModal.result.source_query"></span>
+        </div>
+
+        <div x-show="resultModal.result && resultModal.result.focused_summary" class="mb-4 rounded-[22px] border border-[var(--line)] bg-white/52 px-4 py-3 text-sm italic leading-7 text-[var(--muted)]" x-text="resultModal.result && resultModal.result.focused_summary"></div>
+
+        <!-- equation 渲染成功 -->
+        <div class="rounded-[24px] border border-[var(--line)] bg-white/58 px-4 py-4 text-sm leading-relaxed text-[var(--text)]"
+             x-show="resultModal.renderedHtml"
+             x-html="resultModal.renderedHtml || ''"></div>
+        <!-- equation 渲染失败：提示 + 原始字符串 -->
+        <div x-show="resultModal.renderFailed" class="space-y-3">
+          <div class="flex items-center gap-2 rounded-[16px] border border-[rgba(197,109,71,0.22)] bg-[var(--accent-soft)] px-3 py-2 text-xs text-[var(--accent-deep)]">
+            <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            LaTeX 渲染失败，以下为原始内容
+          </div>
+          <div class="rounded-[24px] border border-[var(--line)] bg-white/58 px-4 py-4 text-sm leading-8 text-[var(--text)] whitespace-pre-wrap font-mono"
+               x-text="resultModal.result && (resultModal.result.content || resultModal.result.caption || '')"></div>
+        </div>
+        <!-- 普通文本 / 未尝试渲染 -->
+        <div class="rounded-[24px] border border-[var(--line)] bg-white/58 px-4 py-4 text-sm leading-8 text-[var(--text)] whitespace-pre-wrap"
+             x-show="!resultModal.renderedHtml && !resultModal.renderFailed"
+             x-text="resultModal.result && (resultModal.result.content || resultModal.result.caption || '暂无完整内容')"></div>
+
+        <div class="mt-4 flex flex-wrap gap-2" x-show="resultModal.result && resultModal.result.hit_paths && resultModal.result.hit_paths.length">
+          <template x-for="hp in (resultModal.result && resultModal.result.hit_paths || [])" :key="hp">
+            <span class="rounded-full border border-[var(--line)] bg-white/45 px-2.5 py-1 text-xs text-[var(--muted)]" x-text="hp"></span>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-backdrop flex items-center justify-center p-3 md:p-6"
+    x-show="imageModal.open"
+    x-transition.opacity.duration.180ms
+    @click.self="closeImageModal()"
+  >
+    <div class="modal-panel flex h-[min(92vh,920px)] w-full max-w-6xl flex-col overflow-hidden rounded-[32px]">
+      <div class="flex items-center justify-between gap-4 border-b border-[var(--line)] px-5 py-4 md:px-6">
+        <div class="min-w-0">
+          <div class="section-kicker" x-text="imageModal.title || 'Image Viewer'"></div>
+          <div class="mt-2 text-lg font-semibold text-[var(--text)]" x-text="imageModal.image && (imageModal.image.paper_id || 'unknown paper')"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="ghost-button rounded-full px-3 py-2 text-sm font-medium" @click="zoomImage(-0.25)">缩小</button>
+          <button class="ghost-button rounded-full px-3 py-2 text-sm font-medium" @click="resetImageZoom()">重置</button>
+          <button class="ghost-button rounded-full px-3 py-2 text-sm font-medium" @click="zoomImage(0.25)">放大</button>
+          <button class="ghost-button flex h-10 w-10 items-center justify-center rounded-full" @click="closeImageModal()" aria-label="关闭图片查看器">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_340px]">
+        <div class="viewer-stage flex min-h-[340px] items-center justify-center overflow-auto p-4 md:p-6" @wheel.prevent="zoomImage($event.deltaY < 0 ? 0.1 : -0.1)">
+          <img
+            x-show="imageModal.image && imageModal.image.image_url"
+            :src="imageModal.image && imageModal.image.image_url"
+            :alt="(imageModal.image && imageModal.image.paper_id ? imageModal.image.paper_id : 'paper') + ' figure preview'"
+            class="viewer-image max-h-full max-w-full object-contain shadow-2xl"
+            :style="'transform: scale(' + imageModal.zoom + ');'"
+            loading="lazy"
+            @dblclick="toggleImageZoom()"
+          />
+        </div>
+
+        <div class="overflow-y-auto border-t border-[var(--line)] bg-white/55 p-5 md:border-l md:border-t-0 md:p-6">
+          <div class="section-kicker">Image Meta</div>
+          <div class="mt-4 flex flex-wrap gap-2 text-xs text-[var(--muted)]" x-show="imageModal.image">
+            <span class="toolbar-pill rounded-full px-3 py-1.5" x-show="imageModal.index != null">#<span x-text="(imageModal.index || 0) + 1"></span></span>
+            <span class="toolbar-pill rounded-full px-3 py-1.5" x-show="imageModal.image && imageModal.image.page">p. <span x-text="imageModal.image && imageModal.image.page"></span></span>
+            <span class="toolbar-pill rounded-full px-3 py-1.5" x-show="imageModal.image && imageModal.image.score != null" x-text="'score ' + formatScore(imageModal.image && imageModal.image.score, 3)"></span>
+            <span class="toolbar-pill rounded-full px-3 py-1.5" x-text="'zoom ' + Math.round(imageModal.zoom * 100) + '%'"></span>
+          </div>
+
+          <div class="mt-5 rounded-[24px] border border-[var(--line)] bg-white/60 px-4 py-4 text-sm leading-7 text-[var(--text)]">
+            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-soft)]">Caption</div>
+            <div class="mt-3 whitespace-pre-wrap" x-text="imageModal.image && (imageModal.image.caption || imageModal.image.content || '暂无说明')"></div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2" x-show="imageModal.image && imageModal.image.hit_paths && imageModal.image.hit_paths.length">
+            <template x-for="hp in (imageModal.image && imageModal.image.hit_paths || [])" :key="hp">
+              <span class="rounded-full border border-[var(--line)] bg-white/45 px-2.5 py-1 text-xs text-[var(--muted)]" x-text="hp"></span>
+            </template>
+          </div>
+
+          <div class="mt-5 text-xs leading-6 text-[var(--muted)]">
+            鼠标滚轮可缩放，双击图片可在 100% 与 200% 之间切换。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/app.js?v=20260525-modeling-agent-1"></script>
+</body>
+</html>

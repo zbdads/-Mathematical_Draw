@@ -1,0 +1,72 @@
+paths:
+  pdf_dir: database/pdf
+  chunks_dir: database/chunks
+  index_dir: database/index
+  models_dir: models
+  docling_models_dir: models/docling
+
+embedder:
+  mode: api   # local | api | hash
+  text_model_name: bge-m3
+  batch_size: 10
+  embedding_dim: 4096
+  api_model_name: qwen/qwen3-embedding-8b
+  api_base_url: https://openrouter.ai/api/v1
+  api_key_env: EMBEDDING_API_KEY
+  api_dimensions:
+  image_mode: api   # local | api
+  image_model_name: qwen3-vl-embedding
+  image_api_url: https://dashscope.aliyuncs.com/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding
+  image_api_key_env: EMBEDDING_API_KEY
+  image_embedding_dim: 2560
+
+chunker:
+  chunk_size: 2000
+  overlap_sentences: 2
+  min_chunk_size: 200
+  prepend_header: true
+
+retriever:
+  top_k: 5
+  top_k_fig: 2
+  figure_alpha: 0.8
+  figure_beta: 0.5
+  multi_paper_balanced: true
+  multi_paper_per_doc_k: 3
+
+generator:
+  model_name: gpt-4o-mini
+  base_url: https://api.openai.com/v1
+  wire_api: chat
+  api_key_env: OPENAI_API_KEY
+  max_new_tokens: 2048
+  temperature: 0.0
+  token_budget: 4000
+  answer_language: English
+  reasoning_effort: xhigh
+  disable_response_storage: true
+  timeout_seconds: 300
+
+reranker:
+  enabled: false
+  model_name: bge-reranker-base
+  candidate_k: 20   # 粗排候选数，rerank 后截取 retriever.top_k
+  decompose_top_k: 10   # decompose 模式 BGE 精排后最终保留的 text chunk 数
+
+guardrails:
+  min_results: 1
+  min_top1_score: 0.25
+  min_total_chars: 180
+
+caption_model:
+  mode: api   # local | api
+  model_dir: models/Qwen/Qwen3-VL-8B-Instruct
+  model_name: qwen3-vl-plus
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  api_key_env: LLM_API_KEY
+  # LoRA 微调的 Adapter 路径, 打开以启用微调后的模型
+  # adapter_path: models/Qwen/Qwen3-VL-8B-Instruct-LoRA-RetrievalCaption-v5-best-ckpt1000
+
+agent:
+  max_steps: 10
+  evidence_cap: 15
