@@ -1,5 +1,3 @@
-# -Mathematical_Draw
-A multimodal scientific-paper intelligence system for retrieval, agentic reasoning, and harness-guided mathematical modeling.
 # Mathematical Draw
 
 > Agentic multimodal RAG for scientific papers, evidence-grounded mathematical modeling, and optimization-code generation.
